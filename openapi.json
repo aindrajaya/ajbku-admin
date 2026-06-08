@@ -309,7 +309,8 @@
           "SUPER_ADMIN",
           "PRINCIPAL",
           "ADMIN_OFFICE",
-          "ADMIN_INTAKE"
+          "ADMIN_INTAKE",
+          "CLIENT"
         ]
       }
     },
@@ -389,7 +390,8 @@
           "ADMIN_INTAKE",
           "ADMIN_OFFICE",
           "PRINCIPAL",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "CLIENT"
         ]
       },
       "get": {
@@ -545,6 +547,41 @@
         ]
       }
     },
+    "/api/v1/matters/service-categories": {
+      "get": {
+        "operationId": "MatterController_listServiceCategories",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List service categories (optionally filter by tenant)",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
     "/api/v1/matters/{id}/status": {
       "patch": {
         "operationId": "MatterController_updateStatus",
@@ -692,6 +729,13 @@
         "summary": "Generate pre-signed upload URL dokumen",
         "tags": [
           "documents"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -739,6 +783,13 @@
         "summary": "Konfirmasi upload dokumen selesai",
         "tags": [
           "documents"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -778,6 +829,9 @@
         "summary": "Verifikasi status dokumen oleh staf/admin",
         "tags": [
           "documents"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE"
         ]
       }
     },
@@ -840,7 +894,7 @@
       }
     },
     "/api/v1/matters/{matterId}/assignment/recommendations": {
-      "post": {
+      "get": {
         "operationId": "AssignmentController_recommendations",
         "parameters": [
           {
@@ -853,7 +907,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -865,6 +919,11 @@
         "summary": "Generate snapshot rekomendasi notaris internal",
         "tags": [
           "assignment"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL"
         ]
       }
     },
@@ -904,6 +963,11 @@
         "summary": "Tetapkan notaris untuk matter",
         "tags": [
           "assignment"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL"
         ]
       }
     },
@@ -933,6 +997,9 @@
         "summary": "Notaris menerima assignment",
         "tags": [
           "assignment"
+        ],
+        "x-roles": [
+          "NOTARY"
         ]
       }
     },
@@ -972,6 +1039,11 @@
         "summary": "Notaris menolak assignment",
         "tags": [
           "assignment"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL"
         ]
       }
     },
@@ -1016,7 +1088,8 @@
           "FINANCE_ADMIN",
           "ADMIN_OFFICE",
           "PRINCIPAL",
-          "SUPER_ADMIN"
+          "SUPER_ADMIN",
+          "CLIENT"
         ]
       }
     },
@@ -1340,6 +1413,12 @@
         "summary": "Buat appointment fisik untuk tanda tangan",
         "tags": [
           "schedule"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "NOTARY"
         ]
       }
     },
@@ -1379,6 +1458,12 @@
         "summary": "Reschedule appointment",
         "tags": [
           "schedule"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "NOTARY"
         ]
       }
     },
@@ -1408,6 +1493,12 @@
         "summary": "Konfirmasi kehadiran dan penandatanganan",
         "tags": [
           "schedule"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "NOTARY"
         ]
       }
     },
@@ -1428,6 +1519,13 @@
         "summary": "List agenda pertemuan physical",
         "tags": [
           "schedule"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL"
         ]
       }
     },
@@ -1467,6 +1565,10 @@
         "summary": "Tambah/update step validasi BPN matter",
         "tags": [
           "bpn"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE"
         ]
       },
       "get": {
@@ -1927,8 +2029,7 @@
         "x-roles": [
           "ADMIN_INTAKE",
           "ADMIN_OFFICE",
-          "PRINCIPAL",
-          "SUPER_ADMIN"
+          "PRINCIPAL"
         ]
       },
       "post": {
@@ -1970,8 +2071,7 @@
         "x-roles": [
           "ADMIN_INTAKE",
           "ADMIN_OFFICE",
-          "PRINCIPAL",
-          "SUPER_ADMIN"
+          "PRINCIPAL"
         ]
       }
     },
@@ -2005,8 +2105,7 @@
         "x-roles": [
           "ADMIN_INTAKE",
           "ADMIN_OFFICE",
-          "PRINCIPAL",
-          "SUPER_ADMIN"
+          "PRINCIPAL"
         ]
       }
     },
@@ -2040,8 +2139,7 @@
         "x-roles": [
           "ADMIN_INTAKE",
           "ADMIN_OFFICE",
-          "PRINCIPAL",
-          "SUPER_ADMIN"
+          "PRINCIPAL"
         ]
       }
     },
@@ -2424,7 +2522,26 @@
       },
       "PresignDocumentDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "docType": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "fileSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "docType",
+          "fileName",
+          "mimeType",
+          "fileSize"
+        ]
       },
       "CompleteDocumentUploadDto": {
         "type": "object",
@@ -2432,15 +2549,54 @@
       },
       "VerifyDocumentDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "verificationStatus": {
+            "type": "string",
+            "enum": [
+              "validated",
+              "needs_revision",
+              "rejected"
+            ]
+          },
+          "revisionNote": {
+            "type": "string",
+            "description": "Wajib diisi jika status verification adalah needs_revision."
+          },
+          "extractedData": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Data hasil ekstraksi manual atau OCR."
+          }
+        },
+        "required": [
+          "verificationStatus"
+        ]
       },
       "DecideAssignmentDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "notaryId": {
+            "type": "string",
+            "description": "UUID notaris dari daftar rekomendasi matter."
+          }
+        },
+        "required": [
+          "notaryId"
+        ]
       },
       "RejectAssignmentDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Alasan penolakan rekomendasi assignment."
+          }
+        },
+        "required": [
+          "reason"
+        ]
       },
       "InitiatePaymentDto": {
         "type": "object",
@@ -2456,15 +2612,66 @@
       },
       "CreateScheduleDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "scheduledAt": {
+            "type": "string",
+            "description": "Tanggal dan waktu jadwal tanda tangan dalam ISO 8601."
+          },
+          "location": {
+            "type": "string",
+            "description": "Lokasi pelaksanaan tanda tangan."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Catatan tambahan untuk klien atau internal."
+          }
+        },
+        "required": [
+          "scheduledAt"
+        ]
       },
       "RescheduleDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "scheduledAt": {
+            "type": "string",
+            "description": "Tanggal dan waktu baru dalam ISO 8601."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Alasan perubahan jadwal."
+          }
+        },
+        "required": [
+          "scheduledAt",
+          "reason"
+        ]
       },
       "CreateBpnStepDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "stepCode": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "received",
+              "juridical_review",
+              "bookkeeping",
+              "completed"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "description": "Catatan opsional untuk konteks tambahan tahap ini."
+          },
+          "bpnReferenceNumber": {
+            "type": "string",
+            "description": "Nomor referensi resmi dari kantor BPN."
+          }
+        },
+        "required": [
+          "stepCode"
+        ]
       },
       "ChatMessageDto": {
         "type": "object",
@@ -2740,7 +2947,15 @@
       },
       "CreateMatterInvitationDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email klien yang akan diundang ke matter."
+          }
+        },
+        "required": [
+          "email"
+        ]
       },
       "AcceptManualCodeDto": {
         "type": "object",
