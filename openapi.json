@@ -1,0 +1,2751 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/api/v1/audit-events": {
+      "get": {
+        "operationId": "AuditController_list",
+        "parameters": [
+          {
+            "name": "aggregateType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "aggregateId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actorUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List audit events (admin only)",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login berhasil, return token"
+          },
+          "401": {
+            "description": "Kredensial tidak valid"
+          }
+        },
+        "summary": "Login pengguna dengan email dan password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Perbarui access token dengan refresh token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/totp/verify": {
+      "post": {
+        "operationId": "AuthController_verifyTotp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Verify2faDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TOTP valid"
+          },
+          "401": {
+            "description": "TOTP tidak valid"
+          }
+        },
+        "summary": "Verifikasi TOTP admin setelah login email dan password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Logout pengguna",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "AuthController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Informasi pengguna yang sedang login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/tenants": {
+      "post": {
+        "operationId": "TenantController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTenantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Registrasi tenant baru (Super Admin only)",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}": {
+      "get": {
+        "operationId": "TenantController_findOne",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Detail tenant",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}/offices": {
+      "get": {
+        "operationId": "TenantController_listOffices",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List office per tenant",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "ADMIN_INTAKE"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}/invite": {
+      "post": {
+        "operationId": "TenantController_inviteUser",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Undang user ke tenant",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/matters": {
+      "post": {
+        "operationId": "MatterController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMatterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Buat matter baru",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      },
+      "get": {
+        "operationId": "MatterController_findAll",
+        "parameters": [
+          {
+            "name": "workflowStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "draft",
+                "intake_submitted",
+                "documents_under_review",
+                "documents_verified",
+                "assignment_pending",
+                "notary_assigned",
+                "payment_pending",
+                "payment_verified",
+                "draft_preparation",
+                "draft_review",
+                "schedule_pending",
+                "signing_scheduled",
+                "signing_completed",
+                "post_signing",
+                "bpn_submitted",
+                "bpn_completed",
+                "closed",
+                "cancelled",
+                "manual_review"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignmentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "unassigned",
+                "recommendation_generated",
+                "assigned",
+                "accepted",
+                "rejected",
+                "reassignment_pending",
+                "manual_hold"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "unpaid",
+                "pending",
+                "verified",
+                "failed",
+                "refunded",
+                "disputed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "landCityCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List matters dengan filter dan pagination",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "FINANCE_ADMIN",
+          "MODERATION_OFFICER",
+          "NOTARY",
+          "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/matters/{id}": {
+      "get": {
+        "operationId": "MatterController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Detail matter",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "FINANCE_ADMIN",
+          "MODERATION_OFFICER",
+          "NOTARY",
+          "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/matters/{id}/status": {
+      "patch": {
+        "operationId": "MatterController_updateStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update workflow status matter (dengan state machine)",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{id}/timeline": {
+      "post": {
+        "operationId": "MatterController_addTimeline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTimelineDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Tambah event ke timeline matter",
+        "tags": [
+          "matters"
+        ]
+      },
+      "get": {
+        "operationId": "MatterController_getTimeline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Timeline history matter",
+        "tags": [
+          "matters"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/documents/presign": {
+      "post": {
+        "operationId": "DocumentController_createPresign",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Generate pre-signed upload URL dokumen",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/documents/{documentId}/complete": {
+      "post": {
+        "operationId": "DocumentController_completeUpload",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteDocumentUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Konfirmasi upload dokumen selesai",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{documentId}/verify": {
+      "post": {
+        "operationId": "DocumentController_verify",
+        "parameters": [
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Verifikasi status dokumen oleh staf/admin",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{documentId}/download-url": {
+      "get": {
+        "operationId": "DocumentController_downloadUrl",
+        "parameters": [
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Ambil signed download URL dokumen via policy engine",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{documentId}/download": {
+      "get": {
+        "operationId": "DocumentController_downloadAlias",
+        "parameters": [
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Alias kompatibilitas untuk signed download URL (disarankan gunakan /download-url)",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/assignment/recommendations": {
+      "post": {
+        "operationId": "AssignmentController_recommendations",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Generate snapshot rekomendasi notaris internal",
+        "tags": [
+          "assignment"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/assignment/decide": {
+      "post": {
+        "operationId": "AssignmentController_decide",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideAssignmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Tetapkan notaris untuk matter",
+        "tags": [
+          "assignment"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/assignment/accept": {
+      "post": {
+        "operationId": "AssignmentController_accept",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Notaris menerima assignment",
+        "tags": [
+          "assignment"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/assignment/reject": {
+      "post": {
+        "operationId": "AssignmentController_reject",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectAssignmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Notaris menolak assignment",
+        "tags": [
+          "assignment"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/payment/initiate": {
+      "post": {
+        "operationId": "PaymentController_initiate",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitiatePaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Inisiasi pembayaran matter",
+        "tags": [
+          "payments"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/payments": {
+      "get": {
+        "operationId": "PaymentController_list",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List pembayaran per matter",
+        "tags": [
+          "payments"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN",
+          "NOTARY",
+          "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/escrow": {
+      "get": {
+        "operationId": "EscrowController_getByMatter",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Lihat posisi escrow account matter",
+        "tags": [
+          "escrow"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/escrow/milestones/eligible": {
+      "post": {
+        "operationId": "EscrowController_markEligible",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkMilestoneEligibleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Tandai milestone escrow sebagai eligible",
+        "tags": [
+          "escrow"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/escrow/milestones/{milestoneId}/approve": {
+      "post": {
+        "operationId": "EscrowController_approveMilestone",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "milestoneId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Approve milestone release escrow",
+        "tags": [
+          "escrow"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/escrow/releases": {
+      "post": {
+        "operationId": "EscrowController_createRelease",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReleaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Buat release escrow baru (maker)",
+        "tags": [
+          "escrow"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/escrow/releases/{releaseId}/approve": {
+      "post": {
+        "operationId": "EscrowController_approveRelease",
+        "parameters": [
+          {
+            "name": "releaseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Approve release escrow (checker)",
+        "tags": [
+          "escrow"
+        ],
+        "x-roles": [
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/escrow/releases/{releaseId}/process": {
+      "post": {
+        "operationId": "EscrowController_processRelease",
+        "parameters": [
+          {
+            "name": "releaseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Proses release escrow menjadi ledger debit",
+        "tags": [
+          "escrow"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/webhooks/xendit": {
+      "post": {
+        "operationId": "XenditWebhookController_handle",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Webhook callback Xendit (secured + idempotent)",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/schedules": {
+      "post": {
+        "operationId": "ScheduleController_create",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScheduleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Buat appointment fisik untuk tanda tangan",
+        "tags": [
+          "schedule"
+        ]
+      }
+    },
+    "/api/v1/schedules/{scheduleId}/reschedule": {
+      "patch": {
+        "operationId": "ScheduleController_reschedule",
+        "parameters": [
+          {
+            "name": "scheduleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Reschedule appointment",
+        "tags": [
+          "schedule"
+        ]
+      }
+    },
+    "/api/v1/schedules/{scheduleId}/confirm-attendance": {
+      "post": {
+        "operationId": "ScheduleController_confirmAttendance",
+        "parameters": [
+          {
+            "name": "scheduleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Konfirmasi kehadiran dan penandatanganan",
+        "tags": [
+          "schedule"
+        ]
+      }
+    },
+    "/api/v1/schedules": {
+      "get": {
+        "operationId": "ScheduleController_listAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List agenda pertemuan physical",
+        "tags": [
+          "schedule"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/bpn-steps": {
+      "post": {
+        "operationId": "BpnController_createStep",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBpnStepDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Tambah/update step validasi BPN matter",
+        "tags": [
+          "bpn"
+        ]
+      },
+      "get": {
+        "operationId": "BpnController_listSteps",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List step BPN matter beserta SLA aging",
+        "tags": [
+          "bpn"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/bpn-sync": {
+      "post": {
+        "operationId": "BpnController_sync",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Trigger sinkronisasi status BPN manual/semi-otomatis",
+        "tags": [
+          "bpn"
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "NotificationController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List notifikasi user saat ini",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/{notificationId}/read": {
+      "patch": {
+        "operationId": "NotificationController_markRead",
+        "parameters": [
+          {
+            "name": "notificationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Tandai notifikasi sudah dibaca",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/chat/messages": {
+      "get": {
+        "operationId": "ChatController_listMatterMessages",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessageListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List chat messages per matter (read model API)",
+        "tags": [
+          "chat"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "FINANCE_ADMIN",
+          "MODERATION_OFFICER"
+        ]
+      },
+      "post": {
+        "operationId": "ChatController_sendMatterMessage",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMatterMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessageResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Send chat message to matter workspace",
+        "tags": [
+          "chat"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "FINANCE_ADMIN",
+          "MODERATION_OFFICER"
+        ]
+      }
+    },
+    "/api/v1/chat/threads": {
+      "get": {
+        "operationId": "ChatController_listChatThreads",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatThreadListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List chat inbox threads for the current user",
+        "tags": [
+          "chat"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "FINANCE_ADMIN",
+          "MODERATION_OFFICER"
+        ]
+      }
+    },
+    "/api/v1/chat/threads/{threadId}/read": {
+      "post": {
+        "operationId": "ChatController_markThreadAsRead",
+        "parameters": [
+          {
+            "name": "threadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatThreadReadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Mark a chat thread as read for the current user",
+        "tags": [
+          "chat"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "FINANCE_ADMIN",
+          "MODERATION_OFFICER"
+        ]
+      }
+    },
+    "/api/v1/moderation/messages/flagged": {
+      "get": {
+        "operationId": "ModerationController_listFlagged",
+        "parameters": [
+          {
+            "name": "perPage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List flagged chat messages for moderation queue",
+        "tags": [
+          "moderation"
+        ],
+        "x-roles": [
+          "MODERATION_OFFICER",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/moderation/messages/{messageId}/false-positive": {
+      "patch": {
+        "operationId": "ModerationController_markFalsePositive",
+        "parameters": [
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Mark flagged message as false positive",
+        "tags": [
+          "moderation"
+        ],
+        "x-roles": [
+          "MODERATION_OFFICER",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/moderation/messages/{messageId}/confirm-violation": {
+      "patch": {
+        "operationId": "ModerationController_confirmViolation",
+        "parameters": [
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Confirm violation and block message",
+        "tags": [
+          "moderation"
+        ],
+        "x-roles": [
+          "MODERATION_OFFICER",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/invitations": {
+      "get": {
+        "operationId": "InvitationsController_list",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List client invitations for a matter",
+        "tags": [
+          "invitations"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      },
+      "post": {
+        "operationId": "InvitationsController_create",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMatterInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create client invitation (email/manual code)",
+        "tags": [
+          "invitations"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/invitations/{invitationId}/resend": {
+      "patch": {
+        "operationId": "InvitationsController_resend",
+        "parameters": [
+          {
+            "name": "invitationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Resend invitation",
+        "tags": [
+          "invitations"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/invitations/{invitationId}/revoke": {
+      "patch": {
+        "operationId": "InvitationsController_revoke",
+        "parameters": [
+          {
+            "name": "invitationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Revoke invitation",
+        "tags": [
+          "invitations"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/invitations/accept-manual-code": {
+      "post": {
+        "operationId": "InvitationsController_acceptManualCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptManualCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Accept invitation using manual code (self onboarding)",
+        "tags": [
+          "invitations"
+        ]
+      }
+    },
+    "/api/v1/reports/operational": {
+      "get": {
+        "operationId": "ReportsController_operational",
+        "parameters": [
+          {
+            "name": "periodFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serviceType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Operational report dataset (for CSV/export)",
+        "tags": [
+          "reports"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/reports/repertorium": {
+      "get": {
+        "operationId": "ReportsController_repertorium",
+        "parameters": [
+          {
+            "name": "periodFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Repertorium report dataset (for PDF/export)",
+        "tags": [
+          "reports"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/permissions/endpoint-matrix": {
+      "get": {
+        "operationId": "PermissionsController_getEndpointRoleMatrix",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Endpoint-to-role mapping reference for UI role-based navigation",
+        "tags": [
+          "permissions"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "AJBKu API",
+    "description": "Platform operasional notaris dan PPAT Indonesia - B2B SaaS",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Autentikasi dan manajemen sesi"
+    },
+    {
+      "name": "tenants",
+      "description": "Manajemen tenant dan kantor"
+    },
+    {
+      "name": "matters",
+      "description": "Manajemen perkara"
+    },
+    {
+      "name": "documents",
+      "description": "Upload dan verifikasi dokumen"
+    },
+    {
+      "name": "assignment",
+      "description": "Penugasan notaris"
+    },
+    {
+      "name": "payments",
+      "description": "Pembayaran via Xendit"
+    },
+    {
+      "name": "chat",
+      "description": "Inbox thread dan pesan matter"
+    },
+    {
+      "name": "notifications",
+      "description": "Notifikasi pengguna"
+    },
+    {
+      "name": "audit",
+      "description": "Audit trail"
+    }
+  ],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "access-token": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "admin@kantor-abc.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "P@ssw0rd123"
+          },
+          "tenantCode": {
+            "type": "string",
+            "example": "tenant-abc",
+            "description": "Kode tenant kantor"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "tenantCode"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "Verify2faDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "example": "eyJhbGciOi...",
+            "description": "Supabase access token hasil login email+password admin"
+          },
+          "factorId": {
+            "type": "string",
+            "example": "factor-id-uuid",
+            "description": "Optional factor ID TOTP. Jika kosong, backend pilih faktor TOTP terverifikasi pertama."
+          },
+          "otp": {
+            "type": "string",
+            "example": "123456",
+            "description": "Kode TOTP 6 digit"
+          }
+        },
+        "required": [
+          "accessToken",
+          "otp"
+        ]
+      },
+      "CreateTenantDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "kantor-abc",
+            "description": "Kode unik tenant (slug)"
+          },
+          "name": {
+            "type": "string",
+            "example": "Kantor Notaris ABC & Rekan"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "InviteUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "staf@kantor-abc.com"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Budi Santoso"
+          },
+          "phone": {
+            "type": "string",
+            "example": "08123456789"
+          },
+          "roleCode": {
+            "type": "string",
+            "example": "ADMIN_INTAKE",
+            "description": "Kode role pengguna"
+          },
+          "officeId": {
+            "type": "string",
+            "example": "uuid-office-id"
+          }
+        },
+        "required": [
+          "email",
+          "fullName",
+          "roleCode"
+        ]
+      },
+      "CreateMatterDto": {
+        "type": "object",
+        "properties": {
+          "officeId": {
+            "type": "string"
+          },
+          "clientProfileId": {
+            "type": "string"
+          },
+          "serviceCategoryId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "AJB Rumah Jl. Sudirman No. 10"
+          },
+          "landCityCode": {
+            "type": "string",
+            "example": "3201"
+          },
+          "landProvinceCode": {
+            "type": "string",
+            "example": "32"
+          },
+          "landCertificateNumber": {
+            "type": "string"
+          },
+          "transactionValue": {
+            "type": "number",
+            "example": 500000000
+          }
+        },
+        "required": [
+          "officeId",
+          "clientProfileId",
+          "serviceCategoryId",
+          "title"
+        ]
+      },
+      "UpdateStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "AddTimelineDto": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "statusCode",
+          "title"
+        ]
+      },
+      "PresignDocumentDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CompleteDocumentUploadDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "VerifyDocumentDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "DecideAssignmentDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "RejectAssignmentDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "InitiatePaymentDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "MarkMilestoneEligibleDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateReleaseDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateScheduleDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "RescheduleDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateBpnStepDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ChatMessageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "msg_01"
+          },
+          "threadId": {
+            "type": "string",
+            "example": "thr_01"
+          },
+          "senderUserId": {
+            "type": "string",
+            "example": "usr_01"
+          },
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "file",
+              "system"
+            ]
+          },
+          "bodyText": {
+            "type": "object",
+            "example": "Halo, berkas sudah lengkap."
+          },
+          "isFlagged": {
+            "type": "boolean",
+            "example": false
+          },
+          "isBlocked": {
+            "type": "boolean",
+            "example": false
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "delivered",
+              "read",
+              "censored"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-05-31T12:34:56.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "threadId",
+          "senderUserId",
+          "messageType",
+          "isFlagged",
+          "isBlocked",
+          "status",
+          "createdAt"
+        ]
+      },
+      "ChatMessageListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessageDto"
+            }
+          },
+          "error": {
+            "type": "object",
+            "nullable": true,
+            "default": null
+          },
+          "meta": {
+            "type": "object",
+            "nullable": true,
+            "default": null
+          }
+        },
+        "required": [
+          "data",
+          "error"
+        ]
+      },
+      "ChatMessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ChatMessageDto"
+          },
+          "error": {
+            "type": "object",
+            "nullable": true,
+            "default": null
+          },
+          "meta": {
+            "type": "object",
+            "nullable": true,
+            "default": null
+          }
+        },
+        "required": [
+          "data",
+          "error"
+        ]
+      },
+      "ChatThreadItemDto": {
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "example": "thr_01"
+          },
+          "matterId": {
+            "type": "string",
+            "example": "mat_01"
+          },
+          "matterCaseNumber": {
+            "type": "string",
+            "example": "MTR-2026-00001"
+          },
+          "counterpartyName": {
+            "type": "string",
+            "example": "Budi Santoso"
+          },
+          "counterpartyRole": {
+            "type": "string",
+            "enum": [
+              "client",
+              "notary",
+              "staff"
+            ]
+          },
+          "lastMessage": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatMessageDto"
+              }
+            ]
+          },
+          "lastMessageAt": {
+            "type": "object",
+            "example": "2026-05-31T12:34:56.000Z",
+            "format": "date-time",
+            "nullable": true
+          },
+          "unreadCount": {
+            "type": "number",
+            "example": 3
+          }
+        },
+        "required": [
+          "threadId",
+          "matterId",
+          "matterCaseNumber",
+          "counterpartyName",
+          "counterpartyRole",
+          "lastMessageAt",
+          "unreadCount"
+        ]
+      },
+      "ChatThreadListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatThreadItemDto"
+            }
+          },
+          "error": {
+            "type": "object",
+            "nullable": true,
+            "default": null
+          },
+          "meta": {
+            "type": "object",
+            "nullable": true,
+            "default": null
+          }
+        },
+        "required": [
+          "data",
+          "error"
+        ]
+      },
+      "ChatThreadReadDto": {
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "example": "thr_01"
+          },
+          "lastReadAt": {
+            "type": "string",
+            "example": "2026-05-31T12:34:56.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "threadId",
+          "lastReadAt"
+        ]
+      },
+      "ChatThreadReadResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ChatThreadReadDto"
+          },
+          "error": {
+            "type": "object",
+            "nullable": true,
+            "default": null
+          },
+          "meta": {
+            "type": "object",
+            "nullable": true,
+            "default": null
+          }
+        },
+        "required": [
+          "data",
+          "error"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "limit": {
+            "type": "number",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "example": 42
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total"
+        ]
+      },
+      "SendMatterMessageDto": {
+        "type": "object",
+        "properties": {
+          "bodyText": {
+            "type": "string",
+            "example": "Halo, dokumennya sudah saya unggah."
+          },
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "file",
+              "system"
+            ],
+            "default": "text"
+          }
+        },
+        "required": [
+          "bodyText"
+        ]
+      },
+      "CreateMatterInvitationDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "AcceptManualCodeDto": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  }
+}
