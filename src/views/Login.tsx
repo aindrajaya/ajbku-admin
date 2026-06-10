@@ -86,7 +86,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     try {
       // Verify TOTP via api
       const res = await api.post('/api/v1/auth/totp/verify', {
-        code: totpCode,
+        accessToken: tempTokenData.accessToken,
+        otp: totpCode,
       });
 
       if (res.data.verified) {
@@ -113,6 +114,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     await tokenManager.set('accessToken', access);
     await tokenManager.set('refreshToken', refresh);
     await tokenManager.set('tenantId', user.tenantId);
+    // profileId from AuthUserDto — present for client/notary roles; null for admin roles
+    if (user.profileId) {
+      await tokenManager.set('profileId', user.profileId);
+    }
     await tokenManager.set('isFullyAuthenticated', 'true');
     await tokenManager.set('savedTenantCode', tenantCode);
 
