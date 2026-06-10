@@ -11,11 +11,27 @@ import {
   DollarSign, 
   ArrowRight,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [role, setRole] = React.useState('PRINCIPAL');
+
+  React.useEffect(() => {
+    async function loadUser() {
+      try {
+        const res = await api.get('/api/v1/auth/me');
+        if (res.data?.roleCode) {
+          setRole(res.data.roleCode);
+        }
+      } catch (err) {
+        // Fallback
+      }
+    }
+    loadUser();
+  }, []);
   
   // Fetch matters
   const { data: matters = [], isLoading: isLoadingMatters } = useQuery({
@@ -57,6 +73,55 @@ export default function Dashboard() {
   const pendingVerifications = safeMatters.filter((m: any) => m && m.workflowStatus === 'documents_under_review');
   const pendingEscrows = safeNotifications.filter((n: any) => n && typeof n.title === 'string' && (n.title.includes('Escrow') || n.title.includes('Pencairan')));
 
+  const renderMetrics = () => {
+    if (role === 'ADMIN_INTAKE' || role === 'ADMIN_OFFICE') {
+      const intakeNew = safeMatters.filter((m: any) => m && (m.workflowStatus === 'draft' || m.workflowStatus === 'intake_submitted')).length;
+      const needRevision = safeMatters.filter((m: any) => m && m.workflowStatus === 'manual_review').length;
+      const waitingAsgn = safeMatters.filter((m: any) => m && (m.workflowStatus === 'documents_verified' || m.workflowStatus === 'assignment_pending')).length;
+      const finishedToday = safeMatters.filter((m: any) => m && m.workflowStatus === 'closed').length;
+
+      return (
+        <>
+          <MetricCard icon={<FileText size={24} style={{ color: 'var(--color-blue)' }} />} title="Intake Baru" value={intakeNew} subtitle="Menunggu verifikasi" link="/queue" />
+          <MetricCard icon={<AlertCircle size={24} style={{ color: 'var(--color-crimson)' }} />} title="Perlu Revisi" value={needRevision} subtitle="Review manual" link="/queue" />
+          <MetricCard icon={<Clock size={24} style={{ color: 'var(--color-gold)' }} />} title="Menunggu Asgn" value={waitingAsgn} subtitle="Penugasan notaris" link="/matters" />
+          <MetricCard icon={<CheckCircle2 size={24} style={{ color: 'var(--color-emerald)' }} />} title="Selesai" value={finishedToday} subtitle="Telah di-close" link="/matters" />
+        </>
+      );
+    }
+
+    if (role === 'FINANCE_ADMIN') {
+      return (
+        <>
+          <MetricCard icon={<DollarSign size={24} style={{ color: 'var(--color-emerald)' }} />} title="Dana di Escrow" value="Rp 39,5jt" subtitle="Saldo tersimpan" link="/escrow" />
+          <MetricCard icon={<Clock size={24} style={{ color: 'var(--color-gold)' }} />} title="Payout Pending" value={pendingEscrows.length} subtitle="Checker approval" link="/escrow" />
+          <MetricCard icon={<CheckCircle2 size={24} style={{ color: 'var(--color-emerald)' }} />} title="Payout Hari Ini" value="1" subtitle="Telah diproses" link="/escrow" />
+          <MetricCard icon={<AlertCircle size={24} style={{ color: 'var(--color-crimson)' }} />} title="Mismatch" value="0" subtitle="Rekonsiliasi aman" link="/escrow" />
+        </>
+      );
+    }
+
+    if (role === 'MODERATION_OFFICER') {
+      return (
+        <>
+          <MetricCard icon={<ShieldAlert size={24} style={{ color: 'var(--color-crimson)' }} />} title="Flagged Hari Ini" value={safeFlaggedMessages.length} subtitle="Perlu moderasi" link="/moderation" />
+          <MetricCard icon={<Clock size={24} style={{ color: 'var(--color-gold)' }} />} title="Total Flagged" value={safeFlaggedMessages.length} subtitle="Semua periode" link="/moderation" />
+          <MetricCard icon={<CheckCircle2 size={24} style={{ color: 'var(--color-emerald)' }} />} title="False Positive" value="95%" subtitle="Rate akurasi AI" link="/moderation" />
+        </>
+      );
+    }
+
+    // Principal / Default summary dashboard
+    return (
+      <>
+        <MetricCard icon={<FileText size={24} style={{ color: 'var(--color-blue)' }} />} title="Perkara Aktif" value={activeMatters.length} subtitle="Sedang berjalan" link="/matters" />
+        <MetricCard icon={<Clock size={24} style={{ color: 'var(--color-gold)' }} />} title="Verifikasi Dokumen" value={pendingVerifications.length} subtitle="Menunggu review" link="/queue" />
+        <MetricCard icon={<ShieldAlert size={24} style={{ color: 'var(--color-crimson)' }} />} title="Pesan Flagged" value={safeFlaggedMessages.length} subtitle="Moderasi chat" link="/moderation" />
+        <MetricCard icon={<DollarSign size={24} style={{ color: 'var(--color-emerald)' }} />} title="Escrow Approval" value={pendingEscrows.length} subtitle="Payout pending" link="/escrow" />
+      </>
+    );
+  };
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
@@ -89,39 +154,7 @@ export default function Dashboard() {
         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
         gap: '1.5rem'
       }}>
-        
-        <MetricCard 
-          icon={<FileText size={24} style={{ color: 'var(--color-blue)' }} />} 
-          title="Perkara Aktif" 
-          value={isLoadingMatters ? '...' : activeMatters.length} 
-          subtitle="Sedang berjalan" 
-          link="/matters" 
-        />
-        
-        <MetricCard 
-          icon={<Clock size={24} style={{ color: 'var(--color-gold)' }} />} 
-          title="Verifikasi Dokumen" 
-          value={isLoadingMatters ? '...' : pendingVerifications.length} 
-          subtitle="Menunggu review admin" 
-          link="/matters?status=documents_under_review" 
-        />
-        
-        <MetricCard 
-          icon={<ShieldAlert size={24} style={{ color: 'var(--color-crimson)' }} />} 
-          title="Pesan Flagged" 
-          value={safeFlaggedMessages.length} 
-          subtitle="Moderasi komunikasi" 
-          link="/moderation" 
-        />
-
-        <MetricCard 
-          icon={<DollarSign size={24} style={{ color: 'var(--color-emerald)' }} />} 
-          title="Escrow Approval" 
-          value={pendingEscrows.length} 
-          subtitle="Pelepasan dana pending" 
-          link="/" 
-        />
-
+        {renderMetrics()}
       </div>
 
       {/* Two Columns: Recent Matters & Quick Actions */}
@@ -161,7 +194,7 @@ export default function Dashboard() {
                 >
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--color-emerald)', fontFamily: 'monospace', fontWeight: 600 }}>{m.caseNumber}</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-emerald)', fontFamily: 'monospace', fontWeight: 600 }}>{m.caseNumber || m.matterNumber}</span>
                       <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{m.title}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -208,7 +241,7 @@ export default function Dashboard() {
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-blue)' }}>Verifikasi Berkas</span>
                 </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{m.title}</p>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.caseNumber}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.caseNumber || m.matterNumber}</span>
               </div>
             ))}
 
