@@ -9,13 +9,19 @@ import Layout from './components/Layout';
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
 import IntakeQueue from './views/IntakeQueue';
+import IntakeNew from './views/IntakeNew';
 import Matters from './views/Matters';
 import MatterDetail from './views/MatterDetail';
+import MatterVerify from './views/MatterVerify';
 import Schedules from './views/Schedules';
 import ChatInbox from './views/ChatInbox';
+import EscrowDashboard from './views/EscrowDashboard';
 import Moderation from './views/Moderation';
+import ReportsOperational from './views/ReportsOperational';
+import ReportsRepertorium from './views/ReportsRepertorium';
 import AuditTrail from './views/AuditTrail';
 import Invitations from './views/Invitations';
+import Settings from './views/Settings';
 import { tokenManager } from './api/client';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -169,13 +175,19 @@ export default function App() {
           >
             <Route index element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
             <Route path="queue" element={<ErrorBoundary><IntakeQueue /></ErrorBoundary>} />
+            <Route path="intake/new" element={<ErrorBoundary><IntakeNew /></ErrorBoundary>} />
             <Route path="matters" element={<ErrorBoundary><Matters /></ErrorBoundary>} />
             <Route path="matters/:id" element={<ErrorBoundary><MatterDetail /></ErrorBoundary>} />
+            <Route path="matters/:id/verify" element={<ErrorBoundary><MatterVerify /></ErrorBoundary>} />
             <Route path="schedules" element={<ErrorBoundary><Schedules /></ErrorBoundary>} />
             <Route path="chat" element={<ErrorBoundary><ChatInbox /></ErrorBoundary>} />
+            <Route path="escrow" element={<ErrorBoundary><EscrowDashboard /></ErrorBoundary>} />
             <Route path="moderation" element={<ErrorBoundary><Moderation /></ErrorBoundary>} />
+            <Route path="reports/operational" element={<ErrorBoundary><ReportsOperational /></ErrorBoundary>} />
+            <Route path="reports/repertorium" element={<ErrorBoundary><ReportsRepertorium /></ErrorBoundary>} />
             <Route path="audit" element={<ErrorBoundary><AuditTrail /></ErrorBoundary>} />
             <Route path="invitations" element={<ErrorBoundary><Invitations /></ErrorBoundary>} />
+            <Route path="settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
           </Route>
 
           {/* Catch-all */}
