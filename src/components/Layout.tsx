@@ -16,7 +16,10 @@ import {
   Building,
   Server,
   Sun,
-  Moon
+  Moon,
+  DollarSign,
+  Settings,
+  BarChart3
 } from 'lucide-react';
 import { api, getApiBaseUrl, setApiBaseUrl, tokenManager } from '../api/client';
 
@@ -144,6 +147,18 @@ export default function Layout({ onLogout }: LayoutProps) {
     window.location.reload();
   };
 
+  const role = userProfile?.roleCode || 'PRINCIPAL';
+
+  const showIntake = ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE'].includes(role);
+  const showMatters = ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE', 'FINANCE_ADMIN', 'MODERATION_OFFICER'].includes(role);
+  const showSchedules = ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE'].includes(role);
+  const showEscrow = ['PRINCIPAL', 'SUPER_ADMIN', 'FINANCE_ADMIN'].includes(role);
+  const showModeration = ['PRINCIPAL', 'SUPER_ADMIN', 'MODERATION_OFFICER'].includes(role);
+  const showAudit = ['PRINCIPAL', 'SUPER_ADMIN'].includes(role);
+  const showInvitations = ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE'].includes(role);
+  const showSettings = ['PRINCIPAL', 'SUPER_ADMIN'].includes(role);
+  const showReports = ['PRINCIPAL', 'SUPER_ADMIN', 'FINANCE_ADMIN'].includes(role);
+
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
       
@@ -190,24 +205,46 @@ export default function Layout({ onLogout }: LayoutProps) {
           </div>
         </div>
 
-        {/* Sidebar Menu Links (Using updated Indonesian terminology) */}
+        {/* Sidebar Menu Links (Dinamis berdasar Role) */}
         <nav style={{ flex: 1, padding: '1.5rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', overflowY: 'auto' }}>
           
           <SidebarLink to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" active={location.pathname === '/'} />
           
-          <SidebarLink to="/queue" icon={<Inbox size={18} />} label="Antrian Pengajuan" active={location.pathname === '/queue'} />
+          {showIntake && (
+            <SidebarLink to="/queue" icon={<Inbox size={18} />} label="Antrian Pengajuan" active={location.pathname === '/queue'} />
+          )}
           
-          <SidebarLink to="/matters" icon={<FileText size={18} />} label="Perkara" active={location.pathname.startsWith('/matters')} />
+          {showMatters && (
+            <SidebarLink to="/matters" icon={<FileText size={18} />} label="Perkara" active={location.pathname.startsWith('/matters') && !location.pathname.endsWith('/verify')} />
+          )}
           
-          <SidebarLink to="/schedules" icon={<Calendar size={18} />} label="Agenda" active={location.pathname === '/schedules'} />
+          {showSchedules && (
+            <SidebarLink to="/schedules" icon={<Calendar size={18} />} label="Agenda" active={location.pathname === '/schedules'} />
+          )}
+
+          {showEscrow && (
+            <SidebarLink to="/escrow" icon={<DollarSign size={18} />} label="Escrow & Payout" active={location.pathname === '/escrow'} />
+          )}
           
-          <SidebarLink to="/chat" icon={<MessageSquare size={18} />} label="Komunikasi" active={location.pathname === '/chat'} badgeCount={totalChatUnread} />
+          {showModeration && (
+            <SidebarLink to="/moderation" icon={<ShieldAlert size={18} />} label="Moderasi Chat" active={location.pathname === '/moderation'} />
+          )}
+
+          {showReports && (
+            <SidebarLink to="/reports/operational" icon={<BarChart3 size={18} />} label="Laporan" active={location.pathname.startsWith('/reports')} />
+          )}
           
-          <SidebarLink to="/moderation" icon={<ShieldAlert size={18} />} label="Moderasi" active={location.pathname === '/moderation'} />
-          
-          <SidebarLink to="/audit" icon={<History size={18} />} label="Log Audit" active={location.pathname === '/audit'} />
-          
-          <SidebarLink to="/invitations" icon={<UserPlus size={18} />} label="Undangan Staf" active={location.pathname === '/invitations'} />
+          {showInvitations && (
+            <SidebarLink to="/invitations" icon={<UserPlus size={18} />} label="Undangan Klien" active={location.pathname === '/invitations'} />
+          )}
+
+          {showAudit && (
+            <SidebarLink to="/audit" icon={<History size={18} />} label="Log Audit" active={location.pathname === '/audit'} />
+          )}
+
+          {showSettings && (
+            <SidebarLink to="/settings" icon={<Settings size={18} />} label="Pengaturan" active={location.pathname === '/settings'} />
+          )}
 
         </nav>
 
