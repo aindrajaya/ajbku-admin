@@ -189,12 +189,42 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-function unwrapResponse<T>(response: any): { data: T } {
-  const data = response.data;
-  if (data && typeof data === 'object' && 'data' in data && 'error' in data) {
-    return { data: data.data };
+// ============================================================
+// CAMELIZE TRANSFORM
+// Backend MatterResponseDto (and some other DTOs) returns snake_case keys
+// (e.g. workflow_status, land_city_code, matter_number).  This transformer
+// converts every response recursively to camelCase so UI code can use a
+// single consistent naming convention.  Already-camelCase keys are idempotent.
+// ============================================================
+function camelize(str: string): string {
+  return str.replace(/_([a-z0-9])/g, (_, ch) => ch.toUpperCase());
+}
+
+function camelizeKeys(obj: unknown): unknown {
+  if (Array.isArray(obj)) {
+    return obj.map(camelizeKeys);
   }
-  return { data };
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj as Record<string, unknown>).map(([k, v]) => [
+        camelize(k),
+        camelizeKeys(v),
+      ])
+    );
+  }
+  return obj;
+}
+
+function unwrapResponse<T>(response: any): { data: T } {
+  const raw = response.data;
+  // Envelope pattern: { data: <payload>, error: null }
+  let payload: unknown;
+  if (raw && typeof raw === 'object' && 'data' in raw && 'error' in raw) {
+    payload = raw.data;
+  } else {
+    payload = raw;
+  }
+  return { data: camelizeKeys(payload) as T };
 }
 
 // ============================================================
