@@ -8,4 +8,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('store:get', key),
   clearTokens: () =>
     ipcRenderer.invoke('store:clearTokens'),
+  exportFile: (opts) =>
+    ipcRenderer.invoke('export:file', opts),
 });

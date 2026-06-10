@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -49,6 +49,23 @@ ipcMain.handle('store:clearTokens', () => {
   delete store.isFullyAuthenticated;
   writeStore(store);
   return true;
+});
+
+ipcMain.handle('export:file', async (event, opts) => {
+  const { filePath, canceled } = await dialog.showSaveDialog({
+    defaultPath: opts.defaultFilename,
+    filters: opts.filters,
+  });
+
+  if (canceled || !filePath) return { success: false };
+
+  try {
+    fs.writeFileSync(filePath, Buffer.from(opts.buffer));
+    return { success: true, filePath };
+  } catch (error) {
+    console.error('Failed to write file:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 function createWindow() {
