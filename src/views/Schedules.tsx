@@ -15,7 +15,14 @@ export default function Schedules() {
     }
   });
 
-  const safeSchedules = Array.isArray(schedules) ? schedules : [];
+  // ScheduleListResponseDto wraps in { items: [] }
+  const safeSchedules = Array.isArray(schedules)
+    ? schedules
+    : Array.isArray((schedules as any)?.items)
+      ? (schedules as any).items
+      : Array.isArray((schedules as any)?.data)
+        ? (schedules as any).data
+        : [];
 
   // Fetch matters to display Case Number labels
   const { data: matters = [] } = useQuery({
@@ -30,7 +37,7 @@ export default function Schedules() {
 
   const getMatterTitle = (matterId: string) => {
     const match = safeMatters.find((m: any) => m.id === matterId);
-    return match ? `${match.caseNumber} - ${match.title}` : 'Detail Perkara';
+    return match ? `${match.caseNumber || match.matterNumber || ''} - ${match.title}` : 'Detail Perkara';
   };
 
   const confirmAttendanceMutation = useMutation({
@@ -74,7 +81,8 @@ export default function Schedules() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {safeSchedules.map((s: any) => {
               const isConfirmed = s.status === 'confirmed';
-              const isAttended = s.status === 'attended';
+              // ScheduleItemDto status enum: scheduled | confirmed | rescheduled | completed | cancelled
+              const isCompleted = s.status === 'completed';
               
               return (
                 <div 
@@ -118,7 +126,7 @@ export default function Schedules() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <MapPin size={14} style={{ color: 'var(--text-muted)' }} />
-                          {s.locationNote || 'Kantor Notaris Terpilih'}
+                          {s.location || s.locationDetail || 'Kantor Notaris Terpilih'}
                         </span>
                         {s.notes && <span>Catatan Rapat: "{s.notes}"</span>}
                       </div>
@@ -126,8 +134,8 @@ export default function Schedules() {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <span className={`badge ${isAttended ? 'badge-green' : isConfirmed ? 'badge-purple' : 'badge-yellow'}`} style={{ fontSize: '0.65rem' }}>
-                      {isAttended ? 'SELESAI HADIR' : isConfirmed ? 'TERKONFIRMASI' : 'PENDING'}
+                    <span className={`badge ${isCompleted ? 'badge-green' : isConfirmed ? 'badge-purple' : 'badge-yellow'}`} style={{ fontSize: '0.65rem' }}>
+                      {isCompleted ? 'SELESAI HADIR' : isConfirmed ? 'TERKONFIRMASI' : 'PENDING'}
                     </span>
 
                     {isConfirmed && (
