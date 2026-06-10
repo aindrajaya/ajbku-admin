@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import axios from 'axios';
 import { 
   MATTER_WORKFLOW_STATUS, 
   MATTER_ASSIGNMENT_STATUS, 
@@ -24,7 +25,8 @@ import {
   Plus,
   Send,
   X,
-  FileCheck
+  FileCheck,
+  CreditCard
 } from 'lucide-react';
 import { normalizeBodyText } from '../views/ChatInbox'; // Re-use normalization
 
@@ -34,7 +36,7 @@ export default function MatterDetail() {
   const queryClient = useQueryClient();
   
   // Tab State
-  const [activeTab, setActiveTab] = useState<'docs' | 'assign' | 'escrow' | 'bpn' | 'agenda' | 'chat'>('docs');
+  const [activeTab, setActiveTab] = useState<'docs' | 'assign' | 'payments' | 'escrow' | 'bpn' | 'agenda' | 'chat'>('docs');
   
   // Matter workflow status edit state
   const [editingStatus, setEditingStatus] = useState(false);
@@ -64,7 +66,8 @@ export default function MatterDetail() {
   // Mutate workflow status
   const updateStatusMutation = useMutation({
     mutationFn: async (status: string) => {
-      await api.patch(`/api/v1/matters/${id}/status`, { workflowStatus: status });
+      // UpdateStatusDto: { status: WorkflowStatus, description?: string }
+      await api.patch(`/api/v1/matters/${id}/status`, { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
@@ -103,12 +106,12 @@ export default function MatterDetail() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--color-emerald)', fontFamily: 'monospace', fontWeight: 700 }}>
-              {safeMatter.caseNumber || '-'}
+              {safeMatter.caseNumber || safeMatter.matterNumber || '-'}
             </span>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>{safeMatter.title || '-'}</h2>
           </div>
           <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            <span>Klien: <strong>{safeMatter.clientName || '-'}</strong></span>
+            <span>Klien: <strong>{safeMatter.clientName || safeMatter.clientProfileName || safeMatter.clientFullName || '-'}</strong></span>
             <span>•</span>
             <span>Wilayah: <strong>Kota/Kab {safeMatter.landCityCode || '-'}</strong></span>
             <span>•</span>
@@ -180,7 +183,7 @@ export default function MatterDetail() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
               <div>
                 <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Jenis Layanan</span>
-                <span style={{ fontWeight: 600 }}>{safeMatter.serviceName || '-'}</span>
+                <span style={{ fontWeight: 600 }}>{safeMatter.serviceName || safeMatter.serviceCategoryName || '-'}</span>
               </div>
               <div>
                 <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Kantor Notaris</span>
@@ -239,6 +242,7 @@ export default function MatterDetail() {
           <div className="glass-panel" style={{ padding: '0.25rem', display: 'flex', gap: '0.25rem' }}>
             <TabButton active={activeTab === 'docs'} onClick={() => setActiveTab('docs')} icon={<FileText size={16} />} label="Dokumen" />
             <TabButton active={activeTab === 'assign'} onClick={() => setActiveTab('assign')} icon={<UserCheck size={16} />} label="Penugasan" />
+            <TabButton active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} icon={<CreditCard size={16} />} label="Pembayaran" />
             <TabButton active={activeTab === 'escrow'} onClick={() => setActiveTab('escrow')} icon={<DollarSign size={16} />} label="Milestone Escrow" />
             <TabButton active={activeTab === 'bpn'} onClick={() => setActiveTab('bpn')} icon={<Map size={16} />} label="Log BPN" />
             <TabButton active={activeTab === 'agenda'} onClick={() => setActiveTab('agenda')} icon={<Calendar size={16} />} label="Agenda Rapat" />
@@ -247,8 +251,9 @@ export default function MatterDetail() {
 
           {/* Tab Content Panels */}
           <div className="glass-panel animate-fade-in" style={{ padding: '2rem', minHeight: '400px' }}>
-            {activeTab === 'docs' && <DocsTab matterId={safeMatter.id || ''} />}
+            {activeTab === 'docs' && <DocsTab matterId={safeMatter.id || ''} documents={safeMatter.documents || []} />}
             {activeTab === 'assign' && <AssignTab matterId={safeMatter.id || ''} />}
+            {activeTab === 'payments' && <PaymentsTab matterId={safeMatter.id || ''} />}
             {activeTab === 'escrow' && <EscrowTab matterId={safeMatter.id || ''} />}
             {activeTab === 'bpn' && <BpnTab matterId={safeMatter.id || ''} />}
             {activeTab === 'agenda' && <AgendaTab matterId={safeMatter.id || ''} />}
@@ -303,7 +308,25 @@ function TabButton({ active, onClick, icon, label }: TabButtonProps) {
 // ======================== TABS IMPLEMENTATION ========================
 
 // 1. DOCUMENTS TAB
-function DocsTab({ matterId }: { matterId: string }) {
+const VALID_DOC_TYPES = [
+  { value: 'ktp', label: 'KTP' },
+  { value: 'kk', label: 'Kartu Keluarga (KK)' },
+  { value: 'npwp', label: 'NPWP' },
+  { value: 'pbb', label: 'PBB' },
+  { value: 'sertifikat', label: 'Sertifikat Tanah' },
+  { value: 'surat_nikah', label: 'Surat Nikah' },
+  { value: 'surat_cerai', label: 'Surat Cerai' },
+  { value: 'akta_kelahiran', label: 'Akta Kelahiran' },
+  { value: 'akta_draft', label: 'Draft Akta' },
+  { value: 'akta_final', label: 'Akta Final' },
+  { value: 'sk_ahli_waris', label: 'SK Ahli Waris' },
+  { value: 'sppht', label: 'SPPHT' },
+  { value: 'bphtb', label: 'BPHTB' },
+  { value: 'pph', label: 'PPh' },
+  { value: 'lainnya', label: 'Lainnya' },
+];
+
+function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: any[] }) {
   const queryClient = useQueryClient();
   
   // States for verification modal
@@ -311,17 +334,14 @@ function DocsTab({ matterId }: { matterId: string }) {
   const [extractedDataText, setExtractedDataText] = useState('');
   const [verifyStatus, setVerifyStatus] = useState<'verified' | 'rejected'>('verified');
 
-  // Simulated upload progress state
+  // Selected document type for upload
+  const [selectedDocType, setSelectedDocType] = useState('ktp');
+
+  // Upload progress state
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Fetch documents list
-  const { data: documents = [], refetch } = useQuery({
-    queryKey: ['matters', matterId, 'docs'],
-    queryFn: async () => {
-      const res = await api.get(`/api/v1/matters/${matterId}/documents`);
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
-    }
-  });
+  // In-flight upload filename to display in the UI during upload progress
+  const [uploadingFileName, setUploadingFileName] = useState('');
 
   const safeDocuments = Array.isArray(documents) ? documents : [];
 
@@ -331,62 +351,91 @@ function DocsTab({ matterId }: { matterId: string }) {
     if (!file) return;
 
     try {
-      setUploadProgress(5); // Start step 1
+      setUploadProgress(5);
+      setUploadingFileName(file.name);
 
       // Step 1: Request presign
       const presignRes = await api.post(`/api/v1/matters/${matterId}/documents/presign`, {
         fileName: file.name,
         mimeType: file.type,
-        docType: file.name.includes('KTP') ? 'ktp' : 'sertifikat',
+        docType: selectedDocType,
         fileSize: file.size
       });
 
-      const { documentId, presignedUrl } = presignRes.data;
+      const { documentId, upload } = presignRes.data as {
+        documentId: string;
+        upload: {
+          bucket: string;
+          key: string;
+          method: string;
+          url: string;
+          token?: string;
+          expiresIn: number;
+        };
+      };
 
-      // Step 2: Simulated upload progression
+      if (!upload?.url) {
+        throw new Error('Gagal mendapatkan URL upload dari server.');
+      }
+
       setUploadProgress(15);
-      const interval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 85) {
-            clearInterval(interval);
-            return 90;
-          }
-          return prev + 15;
-        });
-      }, 300);
 
-      // Simulate network wait
-      await new Promise(r => setTimeout(r, 1600));
-      clearInterval(interval);
+      // Step 2: Actual upload to S3/Supabase storage with progress tracking
+      // Use raw axios to prevent Authorization header insertion (avoid S3/Supabase signature conflict)
+      await axios.put(upload.url, file, {
+        headers: {
+          'Content-Type': file.type
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || file.size));
+          // Map to 15% - 90% progress range
+          setUploadProgress(15 + Math.round(percentCompleted * 0.75));
+        }
+      });
+
       setUploadProgress(92);
 
-      // Step 3: Complete upload
-      await api.post(`/api/v1/matters/${matterId}/documents/${documentId}/complete`);
+      // Step 3: Complete upload in backend database
+      await api.post(`/api/v1/matters/${matterId}/documents/${documentId}/complete`, {
+        storageKey: upload.key,
+        originalFilename: file.name,
+        mimeType: file.type,
+        fileSizeBytes: file.size
+      });
+      
       setUploadProgress(100);
 
-      setTimeout(() => setUploadProgress(0), 1500);
-      refetch();
+      // Invalidate matters queries to reload matter details and update document list
+      await queryClient.invalidateQueries({ queryKey: ['matters', matterId] });
+
+      setTimeout(() => {
+        setUploadProgress(0);
+        setUploadingFileName('');
+      }, 1500);
+
       alert('Dokumen berhasil diunggah!');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Gagal mengunggah berkas.');
+      const errMsg = err?.response?.data?.message || err?.message || 'Gagal mengunggah berkas.';
+      alert(`Gagal mengunggah berkas: ${errMsg}`);
       setUploadProgress(0);
+      setUploadingFileName('');
     }
   };
 
   // Verify Document Mutation
   const verifyMutation = useMutation({
     mutationFn: async (payload: { docId: string; status: 'verified' | 'rejected'; data: any }) => {
-      // POST document verify in NestJS v1.1
+      // Map UI 'verified'/'rejected' to backend enum: 'validated'/'rejected'
+      const verificationStatus = payload.status === 'verified' ? 'validated' : 'rejected';
       await api.post(`/api/v1/documents/${payload.docId}/verify`, {
-        status: payload.status,
+        verificationStatus,
         extractedData: payload.data
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       setVerifyingDoc(null);
-      refetch();
       alert('Review verifikasi berkas disimpan.');
     }
   });
@@ -409,19 +458,41 @@ function DocsTab({ matterId }: { matterId: string }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h4 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Berkas Persyaratan Perkara</h4>
         
-        {/* Upload Button */}
-        <div style={{ position: 'relative' }}>
-          <input 
-            type="file" 
-            id="file-upload" 
-            style={{ display: 'none' }} 
-            onChange={handleFileUpload} 
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          {/* Document Type Dropdown */}
+          <select
+            value={selectedDocType}
+            onChange={(e) => setSelectedDocType(e.target.value)}
+            className="input-field select-field"
+            style={{
+              padding: '0.4rem 0.8rem',
+              fontSize: '0.85rem',
+              width: '180px',
+              margin: 0
+            }}
             disabled={uploadProgress > 0}
-          />
-          <label htmlFor="file-upload" className="btn btn-secondary" style={{ cursor: 'pointer' }}>
-            <Upload size={16} />
-            Unggah Berkas
-          </label>
+          >
+            {VALID_DOC_TYPES.map(type => (
+              <option key={type.value} value={type.value} style={{ background: 'var(--bg-secondary)' }}>
+                {type.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Upload Button */}
+          <div style={{ position: 'relative' }}>
+            <input 
+              type="file" 
+              id="file-upload" 
+              style={{ display: 'none' }} 
+              onChange={handleFileUpload} 
+              disabled={uploadProgress > 0}
+            />
+            <label htmlFor="file-upload" className="btn btn-secondary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+              <Upload size={16} />
+              Unggah Berkas
+            </label>
+          </div>
         </div>
       </div>
 
@@ -429,7 +500,7 @@ function DocsTab({ matterId }: { matterId: string }) {
       {uploadProgress > 0 && (
         <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.4rem' }}>
-            <span>Proses Unggah Dokumen...</span>
+            <span>Mengunggah {uploadingFileName}...</span>
             <span>{uploadProgress}%</span>
           </div>
           <div style={{ width: '100%', height: '6px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -442,61 +513,77 @@ function DocsTab({ matterId }: { matterId: string }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {safeDocuments.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Belum ada berkas pendukung terunggah. Silakan unggah KTP atau Sertifikat tanah.
+            Belum ada berkas pendukung terunggah. Silakan pilih kategori dan unggah dokumen.
           </div>
         ) : (
-          safeDocuments.map((d: any) => (
-            <div 
-              key={d.id} 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '1rem',
-                backgroundColor: 'rgba(0,0,0,0.15)',
-                borderRadius: '8px',
-                border: '1px solid var(--border-glass)'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <FileText size={20} style={{ color: 'var(--color-emerald)' }} />
-                <div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, display: 'block' }}>{d?.fileName}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Tipe: {d?.docType ? d.docType.toUpperCase() : ''} • {d?.fileSize ? (d.fileSize / (1024 * 1024)).toFixed(2) : '0'} MB
+          safeDocuments.map((d: any) => {
+            const docTypeLabel = VALID_DOC_TYPES.find(t => t.value === d.documentType)?.label || d.documentType?.toUpperCase() || 'DOKUMEN';
+            const statusLabels: Record<string, { label: string, className: string }> = {
+              missing: { label: 'BELUM UNGGAH', className: 'badge-gray' },
+              uploaded: { label: 'MENUNGGU VERIFIKASI', className: 'badge-blue' },
+              under_review: { label: 'SEDANG DIREVIEW', className: 'badge-yellow' },
+              revision_required: { label: 'BUTUH REVISI', className: 'badge-red' },
+              verified: { label: 'TERVERIFIKASI', className: 'badge-green' },
+              rejected: { label: 'DITOLAK', className: 'badge-red' }
+            };
+            const currentStatus = statusLabels[d.verificationStatus || 'missing'] || { label: (d.verificationStatus || '').toUpperCase(), className: 'badge-gray' };
+            const docName = `${docTypeLabel} - Perkara`;
+            
+            return (
+              <div 
+                key={d.id} 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '1rem',
+                  backgroundColor: 'rgba(0,0,0,0.15)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-glass)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <FileText size={20} style={{ color: 'var(--color-emerald)' }} />
+                  <div>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, display: 'block' }}>{docName}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Tipe: {docTypeLabel}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span className={`badge ${currentStatus.className}`} style={{ fontSize: '0.65rem' }}>
+                    {currentStatus.label}
                   </span>
+                  
+                  {d.verificationStatus !== 'missing' && (
+                    <button 
+                      onClick={() => triggerDownload(d.id, docName)}
+                      className="btn btn-secondary" 
+                      style={{ padding: '0.35rem 0.6rem' }} 
+                      title="Unduh Berkas"
+                    >
+                      <Download size={14} />
+                    </button>
+                  )}
+
+                  {d.verificationStatus === 'uploaded' && (
+                    <button 
+                      onClick={() => {
+                        setVerifyingDoc(d);
+                        setExtractedDataText(JSON.stringify({ nik: '3519028271890001', nama: 'Budi Santoso' }, null, 2));
+                      }}
+                      className="btn btn-primary" 
+                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                    >
+                      Verifikasi
+                    </button>
+                  )}
                 </div>
               </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span className={`badge ${d?.status === 'verified' ? 'badge-green' : d?.status === 'uploaded' ? 'badge-blue' : 'badge-gray'}`} style={{ fontSize: '0.65rem' }}>
-                  {d?.status === 'uploaded' ? 'MENUNGGU VERIFIKASI' : (d?.status ? d.status.toUpperCase() : '')}
-                </span>
-                
-                <button 
-                  onClick={() => triggerDownload(d.id, d.fileName)}
-                  className="btn btn-secondary" 
-                  style={{ padding: '0.35rem 0.6rem' }} 
-                  title="Unduh Berkas"
-                >
-                  <Download size={14} />
-                </button>
-
-                {d?.status === 'uploaded' && (
-                  <button 
-                    onClick={() => {
-                      setVerifyingDoc(d);
-                      setExtractedDataText(JSON.stringify({ nik: '3519028271890001', nama: 'Budi Santoso' }, null, 2));
-                    }}
-                    className="btn btn-primary" 
-                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
-                  >
-                    Verifikasi
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -524,7 +611,7 @@ function DocsTab({ matterId }: { matterId: string }) {
             </div>
             
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              Berkas: <strong>{verifyingDoc.fileName}</strong>
+              Berkas: <strong>{(VALID_DOC_TYPES.find(t => t.value === verifyingDoc.documentType)?.label || verifyingDoc.documentType || '').toUpperCase()}</strong>
             </p>
 
             <div className="input-group">
@@ -614,7 +701,8 @@ function AssignTab({ matterId }: { matterId: string }) {
     setUiState('deciding');
     try {
       await api.post(`/api/v1/matters/${matterId}/assignment/decide`, {
-        assignedNotaryProfileId: selectedNotaryId
+        // DecideAssignmentDto: { notaryId: string }
+        notaryId: selectedNotaryId
       });
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       setUiState('done');
@@ -1188,10 +1276,10 @@ function BpnTab({ matterId }: { matterId: string }) {
 
             <button 
               onClick={() => addStepMutation.mutate({
+                // CreateBpnStepDto: { stepCode, notes?, bpnReferenceNumber? }
                 stepCode: bpnStep,
-                title: bpnTitle || 'Berkas Diserahkan ke BPN',
-                notes: bpnNotes,
-                referenceNumber: bpnRef || undefined
+                notes: bpnNotes || undefined,
+                bpnReferenceNumber: bpnRef || undefined
               })}
               className="btn btn-primary" 
               style={{ padding: '0.5rem', fontSize: '0.85rem' }}
@@ -1221,11 +1309,14 @@ function AgendaTab({ matterId }: { matterId: string }) {
     }
   });
 
+  // ScheduleListResponseDto wraps items in { items: [] }
   const safeSchedules = Array.isArray(schedulesData)
     ? schedulesData
-    : (schedulesData && Array.isArray((schedulesData as any).data))
-      ? (schedulesData as any).data
-      : [];
+    : Array.isArray((schedulesData as any)?.items)
+      ? (schedulesData as any).items
+      : Array.isArray((schedulesData as any)?.data)
+        ? (schedulesData as any).data
+        : [];
 
   const createScheduleMutation = useMutation({
     mutationFn: async (payload: any) => {
@@ -1283,7 +1374,7 @@ function AgendaTab({ matterId }: { matterId: string }) {
                       {new Date(s.scheduledAt).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-primary)', margin: '0.2rem 0' }}>
-                      Lokasi: {s.locationNote || 'Kantor Notaris'}
+                      Lokasi: {s.location || s.locationDetail || 'Kantor Notaris'}
                     </p>
                     {s.notes && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Catatan: {s.notes}</span>}
                   </div>
@@ -1354,8 +1445,9 @@ function AgendaTab({ matterId }: { matterId: string }) {
             <button 
               disabled={!schedDate || !schedLoc}
               onClick={() => createScheduleMutation.mutate({
+                // CreateScheduleDto: { scheduledAt, location, notes? }
                 scheduledAt: new Date(schedDate).toISOString(),
-                locationNote: schedLoc,
+                location: schedLoc,
                 notes: schedNotes
               })}
               className="btn btn-primary" 
@@ -1500,6 +1592,122 @@ function ChatTab({ matterId }: { matterId: string }) {
         </button>
       </form>
 
+    </div>
+  );
+}
+
+// 7. PAYMENTS TAB — GET /api/v1/matters/{matterId}/payments
+// Response: PaymentListResponseDto { items: PaymentItemDto[] }
+function PaymentsTab({ matterId }: { matterId: string }) {
+  const { data: paymentsData, isLoading } = useQuery({
+    queryKey: ['matters', matterId, 'payments'],
+    queryFn: async () => {
+      const res = await api.get(`/api/v1/matters/${matterId}/payments`);
+      return res.data;
+    },
+    enabled: !!matterId
+  });
+
+  // PaymentListResponseDto wraps in { items: [] }
+  const safePayments: any[] = Array.isArray(paymentsData)
+    ? paymentsData
+    : Array.isArray((paymentsData as any)?.items)
+      ? (paymentsData as any).items
+      : Array.isArray((paymentsData as any)?.data)
+        ? (paymentsData as any).data
+        : [];
+
+  const STATUS_COLORS: Record<string, string> = {
+    unpaid: 'badge-gray',
+    pending: 'badge-yellow',
+    paid: 'badge-blue',
+    verified: 'badge-green',
+    failed: 'badge-red',
+    refunded: 'badge-orange',
+    disputed: 'badge-red',
+  };
+
+  if (isLoading) {
+    return <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Memuat data pembayaran...</div>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <h4 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Riwayat Pembayaran Perkara</h4>
+
+      {safePayments.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+          Belum ada data pembayaran untuk perkara ini.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {safePayments.map((p: any) => (
+            <div
+              key={p.id}
+              style={{
+                padding: '1.25rem',
+                backgroundColor: 'rgba(0,0,0,0.15)',
+                border: '1px solid var(--border-glass)',
+                borderRadius: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+                    Rp {(p.totalAmount || p.amount || 0).toLocaleString('id-ID')}
+                  </span>
+                  {p.taxAmount ? (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                      (termasuk pajak Rp {p.taxAmount.toLocaleString('id-ID')})
+                    </span>
+                  ) : null}
+                </div>
+                <span className={`badge ${STATUS_COLORS[p.status] || 'badge-gray'}`} style={{ fontSize: '0.7rem' }}>
+                  {p.status?.toUpperCase() || 'UNKNOWN'}
+                </span>
+              </div>
+
+              {p.description && (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{p.description}</p>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {p.referenceId && (
+                  <span>Ref: <strong style={{ fontFamily: 'monospace', color: 'var(--color-gold)' }}>{p.referenceId}</strong></span>
+                )}
+                {p.createdAt && (
+                  <span>Dibuat: <strong>{new Date(p.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
+                )}
+                {p.paidAt && (
+                  <span>Dibayar: <strong style={{ color: 'var(--color-emerald)' }}>{new Date(p.paidAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
+                )}
+                {p.verifiedAt && (
+                  <span>Terverifikasi: <strong style={{ color: 'var(--color-emerald)' }}>{new Date(p.verifiedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
+                )}
+                {p.dueDate && (
+                  <span>Jatuh Tempo: <strong>{new Date(p.dueDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
+                )}
+              </div>
+
+              {p.paymentUrl && (
+                <a
+                  href={p.paymentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem', display: 'inline-flex', gap: '0.4rem', alignSelf: 'flex-start', textDecoration: 'none' }}
+                >
+                  <CreditCard size={14} />
+                  Buka Link Pembayaran
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -38,12 +38,13 @@ export const MATTER_ASSIGNMENT_STATUS: Record<string, { label: string; className
 };
 
 export const MATTER_PAYMENT_STATUS: Record<string, { label: string; className: string }> = {
-  unpaid:   { label: 'Belum Bayar',   className: 'badge-gray' },
-  pending:  { label: 'Menunggu',      className: 'badge-yellow' },
-  verified: { label: 'Terverifikasi', className: 'badge-green' },
-  failed:   { label: 'Gagal',         className: 'badge-red' },
-  refunded: { label: 'Dikembalikan',  className: 'badge-orange' },
-  disputed: { label: 'Dipersengketakan', className: 'badge-red' },
+  unpaid:   { label: 'Belum Bayar',         className: 'badge-gray' },
+  pending:  { label: 'Menunggu',             className: 'badge-yellow' },
+  paid:     { label: 'Dibayar',              className: 'badge-blue' },
+  verified: { label: 'Terverifikasi',        className: 'badge-green' },
+  failed:   { label: 'Gagal',               className: 'badge-red' },
+  refunded: { label: 'Dikembalikan',         className: 'badge-orange' },
+  disputed: { label: 'Dipersengketakan',     className: 'badge-red' },
 };
 
 export default function Matters() {
@@ -103,7 +104,7 @@ export default function Matters() {
           </div>
         </div>
 
-        <Link to="/queue" className="btn btn-primary">
+        <Link to="/intake/new" className="btn btn-primary">
           <Plus size={16} />
           Pengajuan Baru
         </Link>
@@ -254,7 +255,7 @@ export default function Matters() {
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <td style={{ padding: '1.25rem 1.5rem', fontFamily: 'monospace', fontWeight: 600, color: 'var(--color-emerald)' }}>
-                      {m.caseNumber}
+                      {m.caseNumber || m.matterNumber}
                     </td>
                     <td style={{ padding: '1.25rem 1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {m.title}
