@@ -1,20 +1,6 @@
 {
   "openapi": "3.0.0",
   "paths": {
-    "/api/v1": {
-      "get": {
-        "operationId": "AppController_getHello",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "App"
-        ]
-      }
-    },
     "/api/v1/audit-events": {
       "get": {
         "operationId": "AuditController_list",
@@ -106,7 +92,14 @@
         },
         "responses": {
           "200": {
-            "description": "Login berhasil, return token"
+            "description": "Login berhasil. Untuk user client/notary, field user.profileId berisi UUID profil domain yang dipakai frontend untuk scoping data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthLoginResponseDto"
+                }
+              }
+            }
           },
           "401": {
             "description": "Kredensial tidak valid"
@@ -134,7 +127,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshTokenResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Perbarui access token dengan refresh token",
@@ -159,7 +159,14 @@
         },
         "responses": {
           "200": {
-            "description": "TOTP valid"
+            "description": "TOTP valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyTotpResponseDto"
+                }
+              }
+            }
           },
           "401": {
             "description": "TOTP tidak valid"
@@ -197,7 +204,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Profil user login saat ini. profileId adalah UUID profil domain (client_profiles.id atau notary_profiles.id) bila tersedia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUserDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -360,6 +374,7 @@
     },
     "/api/v1/matters": {
       "post": {
+        "description": "Untuk role CLIENT, clientProfileId pada body akan dioverride oleh server menjadi profile milik user login. Status awal matter untuk CLIENT adalah intake_submitted.",
         "operationId": "MatterController_create",
         "parameters": [],
         "requestBody": {
@@ -374,7 +389,17 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatterResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Kemungkinan error code: OFFICE_NOT_IN_TENANT, CLIENT_PROFILE_NOT_FOUND, SERVICE_CATEGORY_NOT_FOUND, MATTER_COUNT_FAILED, MATTER_CREATE_FAILED, MATTER_TIMELINE_CREATE_FAILED."
           }
         },
         "security": [
@@ -509,6 +534,41 @@
         ]
       }
     },
+    "/api/v1/matters/service-categories": {
+      "get": {
+        "operationId": "MatterController_listServiceCategories",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List service categories (optionally filter by tenant)",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
     "/api/v1/matters/{id}": {
       "get": {
         "operationId": "MatterController_findOne",
@@ -544,41 +604,6 @@
           "MODERATION_OFFICER",
           "NOTARY",
           "CLIENT"
-        ]
-      }
-    },
-    "/api/v1/matters/service-categories": {
-      "get": {
-        "operationId": "MatterController_listServiceCategories",
-        "parameters": [
-          {
-            "name": "tenantId",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "List service categories (optionally filter by tenant)",
-        "tags": [
-          "matters"
-        ],
-        "x-roles": [
-          "CLIENT",
-          "NOTARY",
-          "ADMIN_INTAKE",
-          "ADMIN_OFFICE",
-          "PRINCIPAL",
-          "SUPER_ADMIN"
         ]
       }
     },
@@ -1072,7 +1097,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentInitiateResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1108,7 +1140,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentListResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1127,6 +1166,21 @@
           "SUPER_ADMIN",
           "NOTARY",
           "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/webhooks/xendit": {
+      "post": {
+        "operationId": "XenditWebhookController_handle",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Webhook callback Xendit (secured + idempotent)",
+        "tags": [
+          "webhooks"
         ]
       }
     },
@@ -1362,21 +1416,6 @@
         ]
       }
     },
-    "/api/v1/webhooks/xendit": {
-      "post": {
-        "operationId": "XenditWebhookController_handle",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Webhook callback Xendit (secured + idempotent)",
-        "tags": [
-          "webhooks"
-        ]
-      }
-    },
     "/api/v1/matters/{matterId}/schedules": {
       "post": {
         "operationId": "ScheduleController_create",
@@ -1419,6 +1458,47 @@
           "ADMIN_OFFICE",
           "PRINCIPAL",
           "NOTARY"
+        ]
+      },
+      "get": {
+        "operationId": "ScheduleController_listByMatter",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List jadwal per matter",
+        "tags": [
+          "schedule"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL"
         ]
       }
     },
@@ -1508,7 +1588,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleListResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2286,6 +2373,20 @@
           "permissions"
         ]
       }
+    },
+    "/api/v1": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
     }
   },
   "info": {
@@ -2316,20 +2417,56 @@
       "description": "Penugasan notaris"
     },
     {
+      "name": "escrow",
+      "description": "Manajemen escrow dan disbursement"
+    },
+    {
       "name": "payments",
       "description": "Pembayaran via Xendit"
+    },
+    {
+      "name": "schedule",
+      "description": "Penjadwalan tanda tangan"
+    },
+    {
+      "name": "bpn",
+      "description": "Tracking status BPN"
+    },
+    {
+      "name": "invitations",
+      "description": "Undangan klien dan onboarding"
     },
     {
       "name": "chat",
       "description": "Inbox thread dan pesan matter"
     },
     {
+      "name": "moderation",
+      "description": "Moderasi konten chat"
+    },
+    {
       "name": "notifications",
       "description": "Notifikasi pengguna"
     },
     {
+      "name": "reports",
+      "description": "Laporan operasional dan repertorium"
+    },
+    {
+      "name": "permissions",
+      "description": "Mapping endpoint ke role"
+    },
+    {
       "name": "audit",
       "description": "Audit trail"
+    },
+    {
+      "name": "webhooks",
+      "description": "Callback payment gateway"
+    },
+    {
+      "name": "health",
+      "description": "Health check"
     }
   ],
   "servers": [],
@@ -2365,6 +2502,80 @@
           "tenantCode"
         ]
       },
+      "AuthUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "profileId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "officeId": {
+            "type": "object",
+            "nullable": true
+          },
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "is2faEnabled": {
+            "type": "boolean"
+          },
+          "lastLoginAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "profileId",
+          "tenantId",
+          "email",
+          "fullName",
+          "roles"
+        ]
+      },
+      "AuthLoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number"
+          },
+          "tokenType": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUserDto"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "user"
+        ]
+      },
       "RefreshTokenDto": {
         "type": "object",
         "properties": {
@@ -2373,6 +2584,27 @@
           }
         },
         "required": [
+          "refreshToken"
+        ]
+      },
+      "RefreshTokenResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number"
+          },
+          "tokenType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken",
           "refreshToken"
         ]
       },
@@ -2398,6 +2630,35 @@
         "required": [
           "accessToken",
           "otp"
+        ]
+      },
+      "VerifyTotpResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number"
+          },
+          "tokenType": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "factorId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "verified",
+          "factorId"
         ]
       },
       "CreateTenantDto": {
@@ -2456,7 +2717,8 @@
             "type": "string"
           },
           "clientProfileId": {
-            "type": "string"
+            "type": "string",
+            "description": "Ignored for CLIENT role - server always resolves from the authenticated user's profile. Optional for compatibility with admin-created matters."
           },
           "serviceCategoryId": {
             "type": "string"
@@ -2483,19 +2745,131 @@
         },
         "required": [
           "officeId",
-          "clientProfileId",
           "serviceCategoryId",
           "title"
         ]
+      },
+      "MatterResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "office_id": {
+            "type": "string"
+          },
+          "client_profile_id": {
+            "type": "string"
+          },
+          "service_category_id": {
+            "type": "string"
+          },
+          "matter_number": {
+            "type": "object",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "land_city_code": {
+            "type": "object",
+            "nullable": true
+          },
+          "land_province_code": {
+            "type": "object",
+            "nullable": true
+          },
+          "land_certificate_number": {
+            "type": "object",
+            "nullable": true
+          },
+          "transaction_value": {
+            "type": "object"
+          },
+          "workflow_status": {
+            "type": "string"
+          },
+          "assignment_status": {
+            "type": "string"
+          },
+          "payment_status": {
+            "type": "string"
+          },
+          "bpn_validation_status": {
+            "type": "string"
+          },
+          "signing_status": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "office_id",
+          "client_profile_id",
+          "service_category_id",
+          "title",
+          "workflow_status",
+          "assignment_status",
+          "payment_status",
+          "bpn_validation_status",
+          "signing_status",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "WorkflowStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "intake_submitted",
+          "documents_under_review",
+          "documents_verified",
+          "assignment_pending",
+          "notary_assigned",
+          "payment_pending",
+          "payment_verified",
+          "draft_preparation",
+          "draft_review",
+          "schedule_pending",
+          "signing_scheduled",
+          "signing_completed",
+          "post_signing",
+          "bpn_submitted",
+          "bpn_completed",
+          "closed",
+          "cancelled",
+          "manual_review"
+        ],
+        "description": "New workflow status to transition the matter to."
       },
       "UpdateStatusDto": {
         "type": "object",
         "properties": {
           "status": {
-            "type": "string"
+            "description": "New workflow status to transition the matter to.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowStatus"
+              }
+            ]
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "description": "Optional note for this status change, stored in the timeline."
           }
         },
         "required": [
@@ -2602,6 +2976,157 @@
         "type": "object",
         "properties": {}
       },
+      "PaymentInitiateResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "matterId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "taxAmount": {
+            "type": "number"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unpaid",
+              "pending",
+              "verified",
+              "failed",
+              "refunded",
+              "disputed",
+              "paid"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "paymentUrl": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "paidAt": {
+            "type": "string"
+          },
+          "verifiedAt": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "checkoutUrl": {
+            "type": "string"
+          },
+          "gatewayRefId": {
+            "type": "object"
+          },
+          "gatewayStatus": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "matterId",
+          "amount",
+          "totalAmount",
+          "description",
+          "status"
+        ]
+      },
+      "PaymentItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "matterId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "taxAmount": {
+            "type": "number"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unpaid",
+              "pending",
+              "verified",
+              "failed",
+              "refunded",
+              "disputed",
+              "paid"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "paymentUrl": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "paidAt": {
+            "type": "string"
+          },
+          "verifiedAt": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "matterId",
+          "amount",
+          "totalAmount",
+          "description",
+          "status"
+        ]
+      },
+      "PaymentListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
       "MarkMilestoneEligibleDto": {
         "type": "object",
         "properties": {}
@@ -2645,6 +3170,77 @@
         "required": [
           "scheduledAt",
           "reason"
+        ]
+      },
+      "ScheduleItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "matterId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "signing"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "confirmed",
+              "rescheduled",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "scheduledAt": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "locationDetail": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "attendees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notesForClient": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "matterId",
+          "type",
+          "status",
+          "scheduledAt",
+          "location",
+          "attendees"
+        ]
+      },
+      "ScheduleListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       },
       "CreateBpnStepDto": {
@@ -2959,7 +3555,20 @@
       },
       "AcceptManualCodeDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Manual invitation code provided by admin to the client via email or WhatsApp. Generated by the server when admin creates an invitation via POST /api/v1/matters/{matterId}/invitations.",
+            "example": "INV-ABCD-1234"
+          },
+          "manualCode": {
+            "type": "string",
+            "description": "Deprecated compatibility alias for older clients. Use code instead."
+          }
+        },
+        "required": [
+          "code"
+        ]
       }
     }
   }
