@@ -1,43 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { BarChart3, Calendar, FileSpreadsheet, RotateCcw, TrendingUp } from 'lucide-react';
+import { csvEscape } from '../lib/export';
+import { notifyError, notifySuccess } from '../store/ui';
 
 export default function ReportsOperational() {
   const [period, setPeriod] = useState('2026-06');
   const [serviceType, setServiceType] = useState('all');
+  const [year, month] = period.split('-').map(Number);
+  const periodTo = `${period}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
 
   const { data: reportData, isLoading, refetch } = useQuery({
     queryKey: ['reports-operational', period, serviceType],
     queryFn: async () => {
       const res = await api.get('/api/v1/reports/operational', {
         periodFrom: `${period}-01`,
-        periodTo: `${period}-30`,
+        periodTo,
         serviceType: serviceType !== 'all' ? serviceType : undefined
       });
       return res.data;
     }
   });
 
-  // Aggregated data fallbacks
   const stats = React.useMemo(() => {
     const rawData = reportData?.data || reportData || [];
     const arr = Array.isArray(rawData) ? rawData : [];
 
     if (arr.length === 0) {
-      // Stunning mockup data matching Section 6.11
       return {
-        total: 42,
-        completed: 18,
-        cancelled: 3,
-        avgDays: 14,
-        chartData: [12, 18, 8, 4], // matters per week
-        serviceDist: [
-          { name: 'AJB-Oke', count: 20, pct: 47, color: 'var(--color-emerald)' },
-          { name: 'AJB-Pajak', count: 12, pct: 28, color: 'var(--color-blue)' },
-          { name: 'Sertipikat', count: 7, pct: 17, color: 'var(--color-gold)' },
-          { name: 'Konsultasi', count: 3, pct: 8, color: 'var(--text-muted)' }
-        ]
+        total: 0,
+        completed: 0,
+        cancelled: 0,
+        avgDays: 0,
+        chartData: [0, 0, 0, 0],
+        serviceDist: [],
       };
     }
 
@@ -80,44 +77,33 @@ export default function ReportsOperational() {
   const handleExportCsv = async () => {
     try {
       const rawData = reportData?.data || reportData || [];
-      const arr = Array.isArray(rawData) ? rawData : [
-        // Dummy rows for CSV if empty
-        { no_perkara: 'MAT-2026-0001', layanan: 'AJB-Oke', klien: 'Budi Santoso', tanggal: '2026-06-01', status: 'closed', nilai: 450000000 },
-        { no_perkara: 'MAT-2026-0002', layanan: 'AJB-Pajak', klien: 'Ratna Dewi', tanggal: '2026-06-03', status: 'signing_scheduled', nilai: 800000000 },
-        { no_perkara: 'MAT-2026-0003', layanan: 'Sertipikat', klien: 'Hendra Wijaya', tanggal: '2026-06-05', status: 'bpn_submitted', nilai: 350000000 }
-      ];
-
-      // Build CSV String (Section 9.2)
+      const arr = Array.isArray(rawData) ? rawData : [];
       const headers = 'No. Perkara,Layanan,Klien,Tanggal Pengajuan,Status,Nilai Transaksi\n';
       const rows = arr.map((row: any) => {
         const c1 = row.caseNumber || row.no_perkara || '';
         const c2 = row.serviceName || row.layanan || '';
-        const c3 = (row.clientName || row.klien || '').replace(/,/g, '');
+        const c3 = row.clientName || row.klien || '';
         const c4 = row.createdAt ? new Date(row.createdAt).toLocaleDateString('id-ID') : row.tanggal || '';
         const c5 = row.workflowStatus || row.status || '';
         const c6 = row.transactionValue || row.nilai || 0;
-        return `${c1},${c2},${c3},${c4},${c5},${c6}`;
+        return [c1, c2, c3, c4, c5, c6].map(csvEscape).join(',');
       }).join('\n');
 
       const csv = headers + rows;
-      
-      // Convert to buffer with UTF-8 BOM
       const buffer = new TextEncoder().encode('\uFEFF' + csv).buffer;
-
-      // Call Electron Preload Dialog
       const filename = `laporan-operasional-${period}.csv`;
-      const result = await window.electronAPI.exportFile({
+      const result = await window.electronAPI.dialog.saveFile({
         buffer,
         defaultFilename: filename,
         filters: [{ name: 'CSV Files', extensions: ['csv'] }]
       });
 
       if (result.success) {
-        alert(`Laporan berhasil diekspor ke: ${result.filePath}`);
+        notifySuccess(`CSV operasional tersimpan di ${result.filePath}.`, 'Export CSV');
       }
     } catch (e) {
       console.error(e);
-      alert('Gagal mengekspor laporan.');
+      notifyError('Gagal mengekspor laporan operasional ke CSV.', 'Export CSV');
     }
   };
 
@@ -257,7 +243,9 @@ export default function ReportsOperational() {
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, justifyContent: 'center' }}>
-                {stats.serviceDist.map((item, idx) => (
+                {stats.serviceDist.length === 0 ? (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Belum ada data distribusi layanan untuk periode ini.</div>
+                ) : stats.serviceDist.map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
                       <span>{item.name}</span>

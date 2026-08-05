@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { normalizeBodyText } from '../lib/communication';
+import { useRealtimeStore } from '../store/realtime';
+import { notifyError, notifySuccess } from '../store/ui';
 import { ShieldAlert, Check, X, AlertTriangle } from 'lucide-react';
-import { normalizeBodyText } from '../views/ChatInbox';
+import { queryKeys } from '../lib/queryKeys';
 
 export default function Moderation() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const perPage = 10;
+  const fallbackEnabled = useRealtimeStore((state) => state.fallbackEnabled);
+  const fallbackIntervalMs = useRealtimeStore((state) => state.fallbackIntervalMs);
 
   // Fetch flagged messages
   const { data: flagged = [], isLoading, refetch } = useQuery({
-    queryKey: ['moderation', 'flagged', page],
+    queryKey: queryKeys.moderationFlaggedMessages(page, perPage),
     queryFn: async () => {
       const res = await api.get('/api/v1/moderation/messages/flagged', {
         page,
@@ -19,7 +24,7 @@ export default function Moderation() {
       });
       return Array.isArray(res.data) ? res.data : res.data?.data || [];
     },
-    refetchInterval: 10000 // Moderation needs fresh data
+    refetchInterval: fallbackEnabled ? fallbackIntervalMs : false
   });
 
   const safeFlagged = Array.isArray(flagged) ? flagged : [];
@@ -31,9 +36,10 @@ export default function Moderation() {
     },
     onSuccess: () => {
       refetch();
-      queryClient.invalidateQueries({ queryKey: ['chat', 'threads'] });
-      alert('Pesan ditandai Aman (False Positive).');
-    }
+      queryClient.invalidateQueries({ queryKey: queryKeys.chatThreads() });
+      notifySuccess('Pesan ditandai aman dan thread terkait telah disegarkan.');
+    },
+    onError: () => notifyError('Gagal menandai pesan sebagai false positive.'),
   });
 
   // Confirm violation mutation
@@ -43,9 +49,10 @@ export default function Moderation() {
     },
     onSuccess: () => {
       refetch();
-      queryClient.invalidateQueries({ queryKey: ['chat', 'threads'] });
-      alert('Pelanggaran dikonfirmasi. Konten pesan disensor penuh.');
-    }
+      queryClient.invalidateQueries({ queryKey: queryKeys.chatThreads() });
+      notifySuccess('Pelanggaran dikonfirmasi. Queue moderasi dan thread terkait telah diperbarui.');
+    },
+    onError: () => notifyError('Gagal mengonfirmasi pelanggaran pesan.'),
   });
 
   return (

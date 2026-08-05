@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import axios from 'axios';
+import { normalizeBodyText, normalizeChatMessage, normalizeChatThread } from '../lib/communication';
+import type { ChatMessage, ChatThread } from '../lib/communication';
+import { useRealtimeStore } from '../store/realtime';
+import { notifyError, notifyInfo, notifySuccess } from '../store/ui';
+import { queryKeys } from '../lib/queryKeys';
 import { 
   MATTER_WORKFLOW_STATUS, 
   MATTER_ASSIGNMENT_STATUS, 
@@ -24,14 +29,12 @@ import {
   Shield,
   Plus,
   Send,
-  X,
   FileCheck,
   CreditCard
 } from 'lucide-react';
-import { normalizeBodyText } from '../views/ChatInbox'; // Re-use normalization
 
 export default function MatterDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false }) as { id: string };
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   
@@ -73,7 +76,7 @@ export default function MatterDetail() {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       setEditingStatus(false);
       refetchTimeline();
-      alert('Status perkara berhasil diperbarui!');
+      notifySuccess('Status perkara berhasil diperbarui.');
     }
   });
 
@@ -328,12 +331,8 @@ const VALID_DOC_TYPES = [
 
 function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: any[] }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   
-  // States for verification modal
-  const [verifyingDoc, setVerifyingDoc] = useState<any | null>(null);
-  const [extractedDataText, setExtractedDataText] = useState('');
-  const [verifyStatus, setVerifyStatus] = useState<'verified' | 'rejected'>('verified');
-
   // Selected document type for upload
   const [selectedDocType, setSelectedDocType] = useState('ktp');
 
@@ -344,6 +343,26 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
   const [uploadingFileName, setUploadingFileName] = useState('');
 
   const safeDocuments = Array.isArray(documents) ? documents : [];
+  const normalizeDocType = (value: unknown) => {
+    const raw = String(value || '').toLowerCase();
+    if (raw === 'sppt_pbb') return 'pbb';
+    if (raw === 'other') return 'lainnya';
+    if (raw.includes('ktp')) return 'ktp';
+    if (raw.includes('kk')) return 'kk';
+    if (raw.includes('npwp')) return 'npwp';
+    if (raw.includes('pbb')) return 'pbb';
+    if (raw.includes('sertifikat')) return 'sertifikat';
+    if (raw.includes('nikah')) return 'surat_nikah';
+    if (raw.includes('cerai')) return 'surat_cerai';
+    if (raw.includes('kelahiran')) return 'akta_kelahiran';
+    if (raw.includes('draft')) return 'akta_draft';
+    if (raw.includes('final')) return 'akta_final';
+    if (raw.includes('waris')) return 'sk_ahli_waris';
+    if (raw.includes('sppht')) return 'sppht';
+    if (raw.includes('bphtb')) return 'bphtb';
+    if (raw.includes('pph')) return 'pph';
+    return raw;
+  };
 
   // Uploader action conforming to 2-step presigned URL uploads
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -413,44 +432,21 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
         setUploadingFileName('');
       }, 1500);
 
-      alert('Dokumen berhasil diunggah!');
+      notifySuccess('Dokumen berhasil diunggah.');
     } catch (err: any) {
       console.error(err);
       const errMsg = err?.response?.data?.message || err?.message || 'Gagal mengunggah berkas.';
-      alert(`Gagal mengunggah berkas: ${errMsg}`);
+      notifyError(`Gagal mengunggah berkas: ${errMsg}`);
       setUploadProgress(0);
       setUploadingFileName('');
     }
   };
 
-  // Verify Document Mutation
-  const verifyMutation = useMutation({
-    mutationFn: async (payload: { docId: string; status: 'verified' | 'rejected'; data: any }) => {
-      // Map UI 'verified'/'rejected' to backend enum: 'validated'/'rejected'
-      const verificationStatus = payload.status === 'verified' ? 'validated' : 'rejected';
-      await api.post(`/api/v1/documents/${payload.docId}/verify`, {
-        verificationStatus,
-        extractedData: payload.data
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['matters'] });
-      setVerifyingDoc(null);
-      alert('Review verifikasi berkas disimpan.');
-    }
-  });
-
-  const triggerDownload = async (docId: string, fileName: string) => {
-    try {
-      // GET download URL in NestJS v1.1
-      const res = await api.get(`/api/v1/documents/${docId}/download-url`);
-      const signedUrl = res.data.url;
-      // Open in browser or show alert
-      window.open(signedUrl, '_blank');
-      alert(`Membuka URL Unduhan Aman untuk ${fileName}`);
-    } catch (err) {
-      alert('Gagal mengambil url unduhan.');
-    }
+  const openEmbeddedViewer = (documentType: string, mode: 'preview' | 'verify') => {
+    localStorage.setItem(`ajbku-verify-target-${matterId}`, documentType);
+    localStorage.setItem(`ajbku-verify-mode-${matterId}`, mode);
+    notifyInfo('Dokumen dibuka di viewer verifikasi tersemat.', 'Dokumen');
+    void navigate({ to: '/matters/$id/verify', params: { id: matterId } });
   };
 
   return (
@@ -517,7 +513,8 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
           </div>
         ) : (
           safeDocuments.map((d: any) => {
-            const docTypeLabel = VALID_DOC_TYPES.find(t => t.value === d.documentType)?.label || d.documentType?.toUpperCase() || 'DOKUMEN';
+            const normalizedDocType = normalizeDocType(d.documentType || d.document_type || d.docType);
+            const docTypeLabel = VALID_DOC_TYPES.find(t => t.value === normalizedDocType)?.label || normalizedDocType?.toUpperCase() || 'DOKUMEN';
             const statusLabels: Record<string, { label: string, className: string }> = {
               missing: { label: 'BELUM UNGGAH', className: 'badge-gray' },
               uploaded: { label: 'MENUNGGU VERIFIKASI', className: 'badge-blue' },
@@ -559,26 +556,23 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
                   
                   {d.verificationStatus !== 'missing' && (
                     <button 
-                      onClick={() => triggerDownload(d.id, docName)}
-                      className="btn btn-secondary" 
-                      style={{ padding: '0.35rem 0.6rem' }} 
-                      title="Unduh Berkas"
-                    >
-                      <Download size={14} />
-                    </button>
-                  )}
+                      onClick={() => openEmbeddedViewer(normalizedDocType, 'preview')}
+                        className="btn btn-secondary" 
+                        style={{ padding: '0.35rem 0.6rem' }} 
+                        title="Pratinjau Dokumen"
+                      >
+                        <Download size={14} />
+                      </button>
+                    )}
 
-                  {d.verificationStatus === 'uploaded' && (
-                    <button 
-                      onClick={() => {
-                        setVerifyingDoc(d);
-                        setExtractedDataText(JSON.stringify({ nik: '3519028271890001', nama: 'Budi Santoso' }, null, 2));
-                      }}
-                      className="btn btn-primary" 
-                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
-                    >
-                      Verifikasi
-                    </button>
+                    {d.verificationStatus === 'uploaded' && (
+                      <button 
+                        onClick={() => openEmbeddedViewer(normalizedDocType, 'verify')}
+                        className="btn btn-primary" 
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                      >
+                        Verifikasi
+                      </button>
                   )}
                 </div>
               </div>
@@ -586,82 +580,6 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
           })
         )}
       </div>
-
-      {/* Verification modal sheet */}
-      {verifyingDoc && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.8)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100
-        }}>
-          <div className="glass-panel animate-fade-in" style={{ width: '450px', padding: '2rem', border: '1px solid var(--border-glass-active)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Review Verifikasi Berkas</h3>
-              <button onClick={() => setVerifyingDoc(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
-            
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              Berkas: <strong>{(VALID_DOC_TYPES.find(t => t.value === verifyingDoc.documentType)?.label || verifyingDoc.documentType || '').toUpperCase()}</strong>
-            </p>
-
-            <div className="input-group">
-              <label className="input-label">Hasil Verifikasi</label>
-              <select 
-                value={verifyStatus} 
-                onChange={(e) => setVerifyStatus(e.target.value as any)}
-                className="input-field select-field"
-              >
-                <option value="verified" style={{ background: 'var(--bg-secondary)' }}>Terima & Validasi Dokumen</option>
-                <option value="rejected" style={{ background: 'var(--bg-secondary)' }}>Tolak Dokumen</option>
-              </select>
-            </div>
-
-            <div className="input-group">
-              <label className="input-label">Hasil Ekstraksi OCR Data (JSON)</label>
-              <textarea 
-                value={extractedDataText}
-                onChange={(e) => setExtractedDataText(e.target.value)}
-                className="input-field" 
-                rows={5} 
-                style={{ fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-              <button onClick={() => setVerifyingDoc(null)} className="btn btn-secondary">
-                Batal
-              </button>
-              <button 
-                onClick={() => {
-                  try {
-                    const parsed = JSON.parse(extractedDataText);
-                    verifyMutation.mutate({
-                      docId: verifyingDoc.id,
-                      status: verifyStatus,
-                      data: parsed
-                    });
-                  } catch (e) {
-                    alert('Format JSON data hasil ekstraksi tidak valid.');
-                  }
-                }} 
-                className="btn btn-primary"
-              >
-                Simpan Review
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );
@@ -673,6 +591,8 @@ function AssignTab({ matterId }: { matterId: string }) {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [selectedNotaryId, setSelectedNotaryId] = useState<string | null>(null);
   const [uiState, setUiState] = useState<'idle' | 'loading' | 'showing' | 'deciding' | 'done'>('idle');
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   // Fetch current assignment recommendation status
   const { data: matter } = useQuery({
@@ -691,7 +611,7 @@ function AssignTab({ matterId }: { matterId: string }) {
       setRecommendations(data);
       setUiState('showing');
     } catch (e) {
-      alert('Gagal menghasilkan rekomendasi.');
+      notifyError('Gagal menghasilkan rekomendasi notaris.');
       setUiState('idle');
     }
   };
@@ -706,24 +626,28 @@ function AssignTab({ matterId }: { matterId: string }) {
       });
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       setUiState('done');
-      alert('Notaris berhasil ditugaskan untuk perkara ini.');
+      notifySuccess('Notaris berhasil ditugaskan untuk perkara ini.');
     } catch (e) {
-      alert('Gagal menetapkan penugasan.');
+      notifyError('Gagal menetapkan penugasan notaris.');
       setUiState('showing');
     }
   };
 
   const rejectAssignment = async () => {
-    const reason = prompt('Masukkan alasan penolakan rekomendasi:');
-    if (!reason) return;
+    if (!rejectReason.trim()) {
+      notifyError('Alasan penolakan rekomendasi wajib diisi.');
+      return;
+    }
     try {
-      await api.post(`/api/v1/matters/${matterId}/assignment/reject`, { reason });
+      await api.post(`/api/v1/matters/${matterId}/assignment/reject`, { reason: rejectReason.trim() });
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       setUiState('idle');
       setRecommendations([]);
-      alert('Rekomendasi berhasil ditolak.');
+      setShowRejectDialog(false);
+      setRejectReason('');
+      notifySuccess('Rekomendasi berhasil ditolak.');
     } catch (e) {
-      alert('Gagal menolak rekomendasi.');
+      notifyError('Gagal menolak rekomendasi notaris.');
     }
   };
 
@@ -816,7 +740,7 @@ function AssignTab({ matterId }: { matterId: string }) {
           </div>
 
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-            <button onClick={rejectAssignment} className="btn btn-secondary" style={{ border: '1px solid rgba(239, 68, 68, 0.25)', color: '#f87171' }}>
+            <button onClick={() => setShowRejectDialog(true)} className="btn btn-secondary" style={{ border: '1px solid rgba(239, 68, 68, 0.25)', color: '#f87171' }}>
               Tolak Rekomendasi
             </button>
             <button onClick={confirmAssignment} disabled={!selectedNotaryId} className="btn btn-primary">
@@ -825,6 +749,25 @@ function AssignTab({ matterId }: { matterId: string }) {
           </div>
         </div>
       )}
+      {showRejectDialog ? (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'grid', placeItems: 'center', zIndex: 120 }}>
+          <div className="glass-panel animate-fade-in" style={{ width: '420px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <h5 style={{ fontSize: '1rem', fontWeight: 700 }}>Tolak Rekomendasi Notaris</h5>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Alasan Penolakan *</label>
+              <textarea className="input-field" rows={4} value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => { setShowRejectDialog(false); setRejectReason(''); }}>
+                Batal
+              </button>
+              <button type="button" className="btn btn-primary" onClick={rejectAssignment}>
+                Kirim Penolakan
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -870,7 +813,7 @@ function EscrowTab({ matterId }: { matterId: string }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matters', matterId, 'escrow'] });
-      alert('Milestone ditandai Eligible.');
+      notifySuccess('Milestone ditandai eligible.');
     }
   });
 
@@ -880,7 +823,7 @@ function EscrowTab({ matterId }: { matterId: string }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matters', matterId, 'escrow'] });
-      alert('Milestone berhasil disetujui.');
+      notifySuccess('Milestone berhasil disetujui.');
     }
   });
 
@@ -893,8 +836,8 @@ function EscrowTab({ matterId }: { matterId: string }) {
       setReleaseAmount('');
       setSelectedMilestone('');
       refetchReleases();
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      alert('Permintaan pencairan dana escrow (Maker) berhasil diajukan.');
+      queryClient.invalidateQueries({ queryKey: queryKeys.notificationsList() });
+      notifySuccess('Permintaan pencairan dana escrow (maker) berhasil diajukan.');
     }
   });
 
@@ -906,13 +849,13 @@ function EscrowTab({ matterId }: { matterId: string }) {
     onSuccess: () => {
       refetchReleases();
       queryClient.invalidateQueries({ queryKey: ['matters', matterId, 'escrow'] });
-      alert('Disetujui Checker. Dana siap didebet dari escrow.');
+      notifySuccess('Payout disetujui checker. Dana siap didebet dari escrow.');
     },
     onError: (err: any) => {
       if (err.message.includes('SAME_USER')) {
-        alert('ROLE CONSTRAINT: Pembuat release (Maker) tidak diperbolehkan menyetujui request miliknya sendiri (Checker)!');
+        notifyError('Pembuat release tidak diperbolehkan menyetujui request miliknya sendiri.');
       } else {
-        alert('Gagal menyetujui pelepasan dana.');
+        notifyError('Gagal menyetujui pelepasan dana.');
       }
     }
   });
@@ -924,8 +867,11 @@ function EscrowTab({ matterId }: { matterId: string }) {
     onSuccess: () => {
       refetchReleases();
       queryClient.invalidateQueries({ queryKey: ['matters', matterId, 'escrow'] });
-      alert('Pencairan dana escrow diproses transfer.');
-    }
+      notifySuccess('Pencairan dana escrow diproses transfer.');
+    },
+    onError: () => {
+      notifyError('Gagal memproses transfer payout escrow.');
+    },
   });
 
   if (!escrow || !actualEscrow) return <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Memuat catatan escrow...</div>;
@@ -1152,8 +1098,9 @@ function BpnTab({ matterId }: { matterId: string }) {
       setBpnNotes('');
       setBpnRef('');
       refetch();
-      alert('Tahapan BPN berhasil ditambahkan ke berkas log.');
-    }
+      notifySuccess('Tahapan BPN berhasil ditambahkan ke berkas log.');
+    },
+    onError: () => notifyError('Gagal menambahkan tahapan BPN.'),
   });
 
   return (
@@ -1327,8 +1274,9 @@ function AgendaTab({ matterId }: { matterId: string }) {
       setSchedLoc('');
       setSchedNotes('');
       refetch();
-      alert('Agenda rapat penandatanganan akta berhasil dijadwalkan!');
-    }
+      notifySuccess('Agenda rapat penandatanganan akta berhasil dijadwalkan.');
+    },
+    onError: () => notifyError('Gagal menjadwalkan agenda rapat penandatanganan.'),
   });
 
   const confirmAttendanceMutation = useMutation({
@@ -1337,8 +1285,9 @@ function AgendaTab({ matterId }: { matterId: string }) {
     },
     onSuccess: () => {
       refetch();
-      alert('Kehadiran dikonfirmasi. Rapat terlaksana dan status berkas dipindahkan ke Penandatanganan Selesai.');
-    }
+      notifySuccess('Kehadiran dikonfirmasi dan status berkas dipindahkan ke penandatanganan selesai.');
+    },
+    onError: () => notifyError('Gagal mengonfirmasi kehadiran rapat.'),
   });
 
   return (
@@ -1467,39 +1416,34 @@ function AgendaTab({ matterId }: { matterId: string }) {
 // 6. CHAT PERKARA TAB
 function ChatTab({ matterId }: { matterId: string }) {
   const queryClient = useQueryClient();
+  const fallbackEnabled = useRealtimeStore((state) => state.fallbackEnabled);
+  const fallbackIntervalMs = useRealtimeStore((state) => state.fallbackIntervalMs);
   const [msgInput, setMsgInput] = useState('');
 
   // Fetch chat messages
-  const { data: messagesData, refetch } = useQuery({
-    queryKey: ['chat', 'messages', matterId],
+  const { data: messagesData = [], refetch } = useQuery<ChatMessage[]>({
+    queryKey: queryKeys.chatThread(matterId),
     queryFn: async () => {
       const res = await api.get(`/api/v1/matters/${matterId}/chat/messages`);
-      return res.data;
+      const rows = Array.isArray(res.data) ? res.data : [];
+      return rows.map(normalizeChatMessage);
     },
-    refetchInterval: 5000 // Poll every 5 seconds inside active chat panel
+    refetchInterval: fallbackEnabled ? fallbackIntervalMs : false
   });
 
-  const safeMessages = Array.isArray(messagesData)
-    ? messagesData
-    : (messagesData && Array.isArray((messagesData as any).data))
-      ? (messagesData as any).data
-      : [];
+  const safeMessages = Array.isArray(messagesData) ? messagesData : [];
 
   // Mark thread read on mount
   useEffect(() => {
     async function markRead() {
       // Find thread to get threadId
       try {
-        const threadsRes = await api.get('/api/v1/chat/threads');
-        const threadsList = Array.isArray(threadsRes.data)
-          ? threadsRes.data
-          : (threadsRes.data && Array.isArray(threadsRes.data.data))
-            ? threadsRes.data.data
-            : [];
-        const match = threadsList.find((t: any) => t.matterId === matterId);
+        const threadsRes = await api.get<ChatThread[]>('/api/v1/chat/threads');
+        const threadsList = (Array.isArray(threadsRes.data) ? threadsRes.data : []).map(normalizeChatThread);
+        const match = threadsList.find((t) => t.matterId === matterId);
         if (match) {
           await api.post(`/api/v1/chat/threads/${match.threadId}/read`);
-          queryClient.invalidateQueries({ queryKey: ['chat', 'threads'] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.chatThreads() });
         }
       } catch (e) {
         console.error('Failed to mark chat as read:', e);
@@ -1510,12 +1454,15 @@ function ChatTab({ matterId }: { matterId: string }) {
 
   const sendMsgMutation = useMutation({
     mutationFn: async (txt: string) => {
-      await api.post(`/api/v1/matters/${matterId}/chat/messages`, { bodyText: txt });
+      await api.post(`/api/v1/matters/${matterId}/chat/messages`, {
+        messageType: 'text',
+        bodyText: txt,
+      });
     },
     onSuccess: () => {
       setMsgInput('');
       refetch();
-      queryClient.invalidateQueries({ queryKey: ['chat', 'threads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chatThreads() });
     }
   });
 

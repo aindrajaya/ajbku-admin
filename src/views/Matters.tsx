@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { api } from '../api/client';
+import { buildMatterListParams, extractMatterList } from '../lib/matters';
 import { FileText, Plus, Filter, Search, RotateCcw } from 'lucide-react';
 
 // Status badge mappings matching PRD Section 4.1
@@ -40,7 +41,6 @@ export const MATTER_ASSIGNMENT_STATUS: Record<string, { label: string; className
 export const MATTER_PAYMENT_STATUS: Record<string, { label: string; className: string }> = {
   unpaid:   { label: 'Belum Bayar',         className: 'badge-gray' },
   pending:  { label: 'Menunggu',             className: 'badge-yellow' },
-  paid:     { label: 'Dibayar',              className: 'badge-blue' },
   verified: { label: 'Terverifikasi',        className: 'badge-green' },
   failed:   { label: 'Gagal',               className: 'badge-red' },
   refunded: { label: 'Dikembalikan',         className: 'badge-orange' },
@@ -60,13 +60,13 @@ export default function Matters() {
   const { data: matters = [], isLoading, refetch } = useQuery({
     queryKey: ['matters', { workflowStatus, assignmentStatus, paymentStatus, landCityCode }],
     queryFn: async () => {
-      const res = await api.get('/api/v1/matters', {
+      const res = await api.get('/api/v1/matters', buildMatterListParams({
         workflowStatus: workflowStatus !== 'all' ? workflowStatus : undefined,
         assignmentStatus: assignmentStatus !== 'all' ? assignmentStatus : undefined,
         paymentStatus: paymentStatus !== 'all' ? paymentStatus : undefined,
-        landCityCode: landCityCode || undefined
-      });
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+        landCityCode: landCityCode || undefined,
+      }));
+      return extractMatterList(res.data);
     }
   });
 
@@ -280,7 +280,7 @@ export default function Matters() {
                     </td>
                     <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
                       <button 
-                        onClick={() => navigate(`/matters/${m.id}`)}
+                        onClick={() => navigate({ to: '/matters/$id', params: { id: m.id } })}
                         className="btn btn-secondary" 
                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', fontWeight: 600 }}
                       >

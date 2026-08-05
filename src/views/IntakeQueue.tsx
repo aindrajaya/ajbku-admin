@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from '@tanstack/react-router';
 import { api } from '../api/client';
+import { buildMatterListParams, extractMatterList } from '../lib/matters';
 import { Inbox, FileText, CheckSquare, ArrowRight, Plus } from 'lucide-react';
 
 export default function IntakeQueue() {
@@ -11,8 +12,8 @@ export default function IntakeQueue() {
   const { data: matters = [], isLoading } = useQuery({
     queryKey: ['matters-intake-queue'],
     queryFn: async () => {
-      const res = await api.get('/api/v1/matters');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const res = await api.get('/api/v1/matters', buildMatterListParams());
+      return extractMatterList(res.data);
     }
   });
 
@@ -89,7 +90,7 @@ export default function IntakeQueue() {
                       transition: 'var(--transition-smooth)',
                       cursor: 'pointer'
                     }}
-                    onClick={() => navigate(`/matters/${m.id}`)}
+                    onClick={() => navigate({ to: '/matters/$id', params: { id: m.id } })}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.01)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
@@ -109,7 +110,7 @@ export default function IntakeQueue() {
                     </td>
                     <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                       <button 
-                        onClick={() => navigate(`/matters/${m.id}/verify`)}
+                        onClick={() => navigate({ to: '/matters/$id/verify', params: { id: m.id } })}
                         className="btn btn-primary" 
                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', gap: '0.25rem' }}
                       >

@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, tokenManager } from '../api/client';
+import { api } from '../api/client';
+import { buildMatterListParams, extractMatterList } from '../lib/matters';
 import { FilePlus, ArrowLeft, Building, User, FileText, Calculator, MapPin, CheckCircle } from 'lucide-react';
+import { useSettingsStore } from '../store/settings';
+import { notifyError, notifySuccess } from '../store/ui';
+import { useAuth } from '../auth/AuthProvider';
 
 export default function IntakeNew() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  const tenantId = tokenManager.getSync('tenantId') || 'tenant-id';
+  const { user } = useAuth();
+  const tenantId = user?.tenantId || 'tenant-id';
+  const tenantSettings = useSettingsStore((state) => state.getTenantSettings(tenantId));
 
   // Form states
   const [officeId, setOfficeId] = useState('');
@@ -40,12 +45,11 @@ export default function IntakeNew() {
     }
   });
 
-  // Extract client profiles from existing matters as a fallback
   const { data: matters = [] } = useQuery({
     queryKey: ['matters-raw-list'],
     queryFn: async () => {
-      const res = await api.get('/api/v1/matters');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const res = await api.get('/api/v1/matters', buildMatterListParams());
+      return extractMatterList(res.data);
     }
   });
 
@@ -56,12 +60,6 @@ export default function IntakeNew() {
         clientsMap.set(m.clientProfileId, m.clientName);
       }
     });
-    // Fallbacks if no matters exist
-    if (clientsMap.size === 0) {
-      clientsMap.set('cli-1', 'Budi Santoso');
-      clientsMap.set('cli-2', 'Ratna Dewi');
-      clientsMap.set('cli-3', 'Hendra Wijaya');
-    }
     return Array.from(clientsMap.entries()).map(([id, name]) => ({ id, name }));
   }, [matters]);
 
@@ -69,8 +67,7 @@ export default function IntakeNew() {
   useEffect(() => {
     if (offices.length > 0) setOfficeId(offices[0].id || offices[0].officeId);
     if (categories.length > 0) setServiceCategoryId(categories[0].id);
-    if (uniqueClients.length > 0) setClientProfileId(uniqueClients[0].id);
-  }, [offices, categories, uniqueClients]);
+  }, [offices, categories]);
 
   // Mutation for matter creation
   const createMatterMutation = useMutation({
@@ -79,32 +76,30 @@ export default function IntakeNew() {
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
-      alert('Perkara baru berhasil didaftarkan!');
-      navigate('/matters');
+      notifySuccess('Perkara baru berhasil didaftarkan.');
+      navigate({ to: '/matters' });
     },
     onError: (err: any) => {
       console.error(err);
-      alert('Gagal membuat perkara baru. Harap periksa kembali input Anda.');
+      notifyError('Gagal membuat perkara baru. Harap periksa kembali input Anda.');
     }
   });
 
   const handleCalculateFee = () => {
-    // Basic standard pricing calculation rule
-    // e.g. Honorarium: 1% of transactionValue, min 2.5jt
-    const baseFee = Math.max(2500000, transactionValue * 0.01);
+    const baseFee = Math.max(tenantSettings.rates.baseFee, transactionValue * 0.01);
     setCalculatedFee(baseFee);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!officeId || !clientProfileId || !serviceCategoryId || !title) {
-      alert('Mohon isi kolom wajib: Kantor, Klien, Kategori Layanan, dan Judul Perkara.');
+    if (!officeId || !serviceCategoryId || !title) {
+      notifyError('Mohon isi kolom wajib: Kantor, Kategori Layanan, dan Judul Perkara.');
       return;
     }
 
     createMatterMutation.mutate({
       officeId,
-      clientProfileId,
+      ...(clientProfileId ? { clientProfileId } : {}),
       serviceCategoryId,
       title,
       landCityCode: landCityCode || undefined,
@@ -121,7 +116,7 @@ export default function IntakeNew() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button onClick={() => navigate(-1)} className="btn btn-secondary" style={{ padding: '0.5rem' }}>
+          <button onClick={() => window.history.back()} className="btn btn-secondary" style={{ padding: '0.5rem' }}>
             <ArrowLeft size={16} />
           </button>
           <div>
@@ -159,7 +154,7 @@ export default function IntakeNew() {
           </div>
 
           <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">Klien Utama *</label>
+            <label className="input-label">Klien Utama</label>
             <div style={{ position: 'relative' }}>
               <User size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <select 
@@ -167,8 +162,10 @@ export default function IntakeNew() {
                 onChange={(e) => setClientProfileId(e.target.value)}
                 className="input-field select-field"
                 style={{ paddingLeft: '2.75rem' }}
-                required
               >
+                <option value="" style={{ background: 'var(--bg-secondary)' }}>
+                  Tentukan nanti
+                </option>
                 {uniqueClients.map((c: any) => (
                   <option key={c.id} value={c.id} style={{ background: 'var(--bg-secondary)' }}>
                     {c.name} (ID: {c.id})

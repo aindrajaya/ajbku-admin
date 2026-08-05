@@ -1,7 +1,9 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { buildMatterListParams, extractMatterList } from '../lib/matters';
 import { Calendar, Clock, MapPin, CheckCircle, AlertCircle } from 'lucide-react';
+import { notifyError, notifySuccess } from '../store/ui';
 
 export default function Schedules() {
   const queryClient = useQueryClient();
@@ -28,8 +30,8 @@ export default function Schedules() {
   const { data: matters = [] } = useQuery({
     queryKey: ['matters'],
     queryFn: async () => {
-      const res = await api.get('/api/v1/matters');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const res = await api.get('/api/v1/matters', buildMatterListParams());
+      return extractMatterList(res.data);
     }
   });
 
@@ -47,8 +49,9 @@ export default function Schedules() {
     onSuccess: () => {
       refetch();
       queryClient.invalidateQueries({ queryKey: ['matters'] });
-      alert('Kehadiran para pihak dikonfirmasi. Status perkara dipindahkan ke Penandatanganan Selesai.');
-    }
+      notifySuccess('Kehadiran para pihak dikonfirmasi. Status perkara dipindahkan ke penandatanganan selesai.');
+    },
+    onError: () => notifyError('Gagal mengonfirmasi kehadiran para pihak.'),
   });
 
   return (

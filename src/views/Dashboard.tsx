@@ -1,9 +1,12 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
-import { api, tokenManager } from '../api/client';
-
-const hasToken = () => !!tokenManager.getSync('accessToken');
+import { Link, useNavigate } from '@tanstack/react-router';
+import { api } from '../api/client';
+import { useAuth } from '../auth/AuthProvider';
+import { getPrimaryAdminRole } from '../auth/access';
+import { normalizeNotificationItem } from '../lib/communication';
+import { buildMatterListParams, extractMatterList } from '../lib/matters';
+import { queryKeys } from '../lib/queryKeys';
 import { 
   FileText, 
   Clock, 
@@ -17,14 +20,17 @@ import {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { status } = useAuth();
   const [role, setRole] = React.useState('PRINCIPAL');
+  const hasToken = status === 'authenticated';
 
   React.useEffect(() => {
     async function loadUser() {
       try {
         const res = await api.get('/api/v1/auth/me');
-        if (res.data?.roleCode) {
-          setRole(res.data.roleCode);
+        const primaryRole = getPrimaryAdminRole(res.data?.roles);
+        if (primaryRole) {
+          setRole(primaryRole);
         }
       } catch (err) {
         // Fallback
@@ -36,17 +42,17 @@ export default function Dashboard() {
   // Fetch matters
   const { data: matters = [], isLoading: isLoadingMatters } = useQuery({
     queryKey: ['matters'],
-    enabled: hasToken(),
+      enabled: hasToken,
     queryFn: async () => {
-      const res = await api.get('/api/v1/matters');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const res = await api.get('/api/v1/matters', buildMatterListParams());
+      return extractMatterList(res.data);
     }
   });
 
   // Fetch flagged messages
   const { data: flaggedMessages = [] } = useQuery({
-    queryKey: ['moderation', 'flagged'],
-    enabled: hasToken(),
+    queryKey: queryKeys.moderationFlaggedMessages(1, 10),
+    enabled: hasToken,
     queryFn: async () => {
       const res = await api.get('/api/v1/moderation/messages/flagged', { page: 1, perPage: 10 });
       return Array.isArray(res.data) ? res.data : res.data?.data || [];
@@ -55,11 +61,12 @@ export default function Dashboard() {
 
   // Fetch notifications
   const { data: notifications = [] } = useQuery({
-    queryKey: ['notifications'],
-    enabled: hasToken(),
+    queryKey: queryKeys.notificationsList(),
+    enabled: hasToken,
     queryFn: async () => {
       const res = await api.get('/api/v1/notifications');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const rows = Array.isArray(res.data) ? res.data : [];
+      return rows.map(normalizeNotificationItem);
     }
   });
 
@@ -208,7 +215,7 @@ export default function Dashboard() {
                     <span className={`badge ${getStatusBadgeClass(m.workflowStatus)}`} style={{ fontSize: '0.65rem' }}>
                       {m.workflowStatus ? m.workflowStatus.replace(/_/g, ' ') : ''}
                     </span>
-                    <Link to={`/matters/${m.id}`} className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}>
+                    <Link to="/matters/$id" params={{ id: m.id }} className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}>
                       Buka
                     </Link>
                   </div>
@@ -234,7 +241,7 @@ export default function Dashboard() {
                   borderRadius: '8px',
                   cursor: 'pointer'
                 }}
-                onClick={() => navigate(`/matters/${m.id}`)}
+                onClick={() => navigate({ to: '/matters/$id', params: { id: m.id } })}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <AlertCircle size={16} style={{ color: 'var(--color-blue)' }} />
@@ -256,7 +263,7 @@ export default function Dashboard() {
                   borderRadius: '8px',
                   cursor: 'pointer'
                 }}
-                onClick={() => navigate(`/moderation`)}
+                onClick={() => navigate({ to: '/moderation' })}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <ShieldAlert size={16} style={{ color: 'var(--color-crimson)' }} />

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { buildMatterListParams, extractMatterList } from '../lib/matters';
 import { UserPlus, Mail, RotateCcw, ShieldAlert, CheckCircle2, Trash, Send } from 'lucide-react';
+import { notifyError, notifySuccess } from '../store/ui';
 
 export default function Invitations() {
   const queryClient = useQueryClient();
@@ -15,8 +17,8 @@ export default function Invitations() {
   const { data: matters = [] } = useQuery({
     queryKey: ['matters-for-invitations'],
     queryFn: async () => {
-      const res = await api.get('/api/v1/matters');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const res = await api.get('/api/v1/matters', buildMatterListParams());
+      return extractMatterList(res.data);
     }
   });
 
@@ -52,7 +54,7 @@ export default function Invitations() {
       setError(null);
       refetchInvitations();
       setTimeout(() => setSuccess(false), 3000);
-      alert('Undangan Klien berhasil dikirim via Email!');
+      notifySuccess('Undangan klien berhasil dikirim via email.');
     },
     onError: () => {
       setError('Gagal mengirim undangan. Pastikan format email benar.');
@@ -65,8 +67,9 @@ export default function Invitations() {
     },
     onSuccess: () => {
       refetchInvitations();
-      alert('Undangan berhasil dikirim ulang.');
-    }
+      notifySuccess('Undangan berhasil dikirim ulang.');
+    },
+    onError: () => notifyError('Gagal mengirim ulang undangan klien.'),
   });
 
   const revokeMutation = useMutation({
@@ -75,8 +78,9 @@ export default function Invitations() {
     },
     onSuccess: () => {
       refetchInvitations();
-      alert('Undangan berhasil dibatalkan (Revoked).');
-    }
+      notifySuccess('Undangan berhasil dibatalkan.');
+    },
+    onError: () => notifyError('Gagal membatalkan undangan klien.'),
   });
 
   const handleSubmit = (e: React.FormEvent) => {

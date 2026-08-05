@@ -1,49 +1,51 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, tokenManager } from '../api/client';
+import { api } from '../api/client';
 import { FileText, Calendar, FileDown, RotateCcw } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { notifyError, notifySuccess } from '../store/ui';
+import { useAuth } from '../auth/AuthProvider';
+
+async function toDataUrl(url: string) {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
 export default function ReportsRepertorium() {
   const [periodFrom, setPeriodFrom] = useState('2026-06-01');
   const [periodTo, setPeriodTo] = useState('2026-06-30');
+  const { user } = useAuth();
+  const tenantId = user?.tenantId || 'tenant-id';
 
-  const tenantId = tokenManager.getSync('tenantId') || 'tenant-id';
-
-  // Fetch tenant details for headers
   const { data: tenant } = useQuery({
     queryKey: ['tenant-details', tenantId],
     queryFn: async () => {
       const res = await api.get(`/api/v1/tenants/${tenantId}`);
       return res.data?.data || res.data || {};
-    }
+    },
   });
 
-  const { data: repertoriumData, isLoading, refetch } = useQuery({
+  const { data: repertoriumData, isLoading } = useQuery({
     queryKey: ['reports-repertorium', periodFrom, periodTo],
     queryFn: async () => {
       const res = await api.get('/api/v1/reports/repertorium', {
         periodFrom,
-        periodTo
+        periodTo,
       });
       return res.data;
-    }
+    },
   });
 
   const entries = React.useMemo(() => {
     const rawData = repertoriumData?.data || repertoriumData || [];
-    const arr = Array.isArray(rawData) ? rawData : [];
-
-    if (arr.length === 0) {
-      // Mock data matching Section 6.12/9.3
-      return [
-        { entry_number: 'REP-2026-0001', entry_date: '2026-06-01', matter_id: 'MAT-2026-0001', service_type: 'AJB-Oke', main_party_name: 'Budi Santoso', land_summary: 'Kec. Manguharjo, Kota Madiun', notary_name: 'Ir. Siti Rahayu, S.H., M.Kn.', status: 'CLOSED' },
-        { entry_number: 'REP-2026-0002', entry_date: '2026-06-05', matter_id: 'MAT-2026-0002', service_type: 'Hibah', main_party_name: 'Ratna Dewi', land_summary: 'Kec. Kartoharjo, Kota Madiun', notary_name: 'Drs. Ahmad Fauzi, S.H.', status: 'CLOSED' },
-        { entry_number: 'REP-2026-0003', entry_date: '2026-06-12', matter_id: 'MAT-2026-0003', service_type: 'APHT', main_party_name: 'Hendra Wijaya', land_summary: 'Kec. Taman, Kota Madiun', notary_name: 'Ir. Siti Rahayu, S.H., M.Kn.', status: 'CLOSED' }
-      ];
-    }
-    return arr;
+    return Array.isArray(rawData) ? rawData : [];
   }, [repertoriumData]);
 
   const handleExportPdf = async () => {
@@ -51,35 +53,42 @@ export default function ReportsRepertorium() {
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const tenantName = tenant?.name || 'Kantor Notaris Sejahtera Madiun';
       const periodLabel = `${periodFrom} s/d ${periodTo}`;
+      const hasLogo = Boolean(tenant?.logoUrl);
 
-      // 1. Header (Section 9.3)
+      if (tenant?.logoUrl) {
+        try {
+          const logoDataUrl = await toDataUrl(tenant.logoUrl);
+          doc.addImage(logoDataUrl, 'PNG', 14, 10, 16, 16);
+        } catch {
+          // Ignore logo fetch failures and keep PDF export working.
+        }
+      }
+
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text(tenantName, 14, 18);
+      doc.text(tenantName, hasLogo ? 34 : 14, 18);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Repertorium Digital · Periode: ${periodLabel}`, 14, 24);
+      doc.text(`Repertorium Digital - Periode: ${periodLabel}`, hasLogo ? 34 : 14, 24);
 
-      // 2. Table Render
       autoTable(doc, {
         startY: 32,
         head: [['No. Rep', 'Tanggal', 'No. Perkara', 'Jenis', 'Pihak Utama', 'Lokasi', 'Notaris', 'Status']],
-        body: entries.map((e: any) => [
-          e.entry_number || e.entryNumber || '',
-          e.entry_date || e.entryDate || '',
-          e.matter_id || e.matterCaseNumber || '',
-          e.service_type || e.serviceName || '',
-          e.main_party_name || e.clientName || '',
-          e.land_summary || e.landSummary || '',
-          e.notary_name || e.notaryName || '',
-          e.status || ''
+        body: entries.map((entry: any) => [
+          entry.entry_number || entry.entryNumber || '',
+          entry.entry_date || entry.entryDate || '',
+          entry.matter_id || entry.matterCaseNumber || '',
+          entry.service_type || entry.serviceName || '',
+          entry.main_party_name || entry.clientName || '',
+          entry.land_summary || entry.landSummary || '',
+          entry.notary_name || entry.notaryName || '',
+          entry.status || '',
         ]),
         styles: { fontSize: 8, cellPadding: 3 },
         headStyles: { fillColor: [13, 148, 136], textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [240, 253, 250] }
+        alternateRowStyles: { fillColor: [240, 253, 250] },
       });
 
-      // 3. Footer with page counts
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
@@ -88,30 +97,25 @@ export default function ReportsRepertorium() {
         doc.text(`Dicetak: ${new Date().toLocaleString('id-ID')}`, 14, 200);
       }
 
-      // Convert to arraybuffer
       const pdfBytes = doc.output('arraybuffer');
-
-      // Call Electron Save Dialog via preload
       const filename = `repertorium-${periodFrom}-ke-${periodTo}.pdf`;
-      const result = await window.electronAPI.exportFile({
+      const result = await window.electronAPI.dialog.saveFile({
         buffer: pdfBytes,
         defaultFilename: filename,
-        filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+        filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
       });
 
       if (result.success) {
-        alert(`Laporan Repertorium berhasil disimpan ke: ${result.filePath}`);
+        notifySuccess(`PDF repertorium tersimpan di ${result.filePath}.`, 'Export PDF');
       }
-    } catch (e) {
-      console.error(e);
-      alert('Gagal mengekspor laporan PDF.');
+    } catch (error) {
+      console.error(error);
+      notifyError('Gagal mengekspor laporan repertorium ke PDF.', 'Export PDF');
     }
   };
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <FileText size={28} style={{ color: 'var(--color-emerald)' }} />
@@ -129,19 +133,12 @@ export default function ReportsRepertorium() {
         </button>
       </div>
 
-      {/* Filter Bar */}
       <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
         <div className="input-group" style={{ marginBottom: 0, flex: 1 }}>
           <label className="input-label" style={{ fontSize: '0.75rem' }}>Dari Tanggal</label>
           <div style={{ position: 'relative' }}>
             <Calendar size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input 
-              type="date" 
-              value={periodFrom} 
-              onChange={(e) => setPeriodFrom(e.target.value)} 
-              className="input-field" 
-              style={{ paddingLeft: '2.25rem', fontSize: '0.85rem' }}
-            />
+            <input type="date" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)} className="input-field" style={{ paddingLeft: '2.25rem', fontSize: '0.85rem' }} />
           </div>
         </div>
 
@@ -149,13 +146,7 @@ export default function ReportsRepertorium() {
           <label className="input-label" style={{ fontSize: '0.75rem' }}>Hingga Tanggal</label>
           <div style={{ position: 'relative' }}>
             <Calendar size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input 
-              type="date" 
-              value={periodTo} 
-              onChange={(e) => setPeriodTo(e.target.value)} 
-              className="input-field" 
-              style={{ paddingLeft: '2.25rem', fontSize: '0.85rem' }}
-            />
+            <input type="date" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} className="input-field" style={{ paddingLeft: '2.25rem', fontSize: '0.85rem' }} />
           </div>
         </div>
 
@@ -164,21 +155,10 @@ export default function ReportsRepertorium() {
         </button>
       </div>
 
-      {/* Table Card */}
       <div className="glass-panel" style={{ overflow: 'hidden' }}>
-        <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          textAlign: 'left',
-          fontSize: '0.9rem',
-          fontFamily: 'var(--font-sans)'
-        }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem', fontFamily: 'var(--font-sans)' }}>
           <thead>
-            <tr style={{
-              background: 'rgba(255,255,255,0.03)',
-              borderBottom: '1px solid var(--border-glass)',
-              color: 'var(--text-secondary)'
-            }}>
+            <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-glass)', color: 'var(--text-secondary)' }}>
               <th style={{ padding: '1rem 1.5rem', fontWeight: 600 }}>No. Rep</th>
               <th style={{ padding: '1rem 1.5rem', fontWeight: 600 }}>Tanggal</th>
               <th style={{ padding: '1rem 1.5rem', fontWeight: 600 }}>No. Perkara</th>
@@ -203,41 +183,17 @@ export default function ReportsRepertorium() {
                 </td>
               </tr>
             ) : (
-              entries.map((e: any, idx: number) => (
-                <tr 
-                  key={idx} 
-                  style={{
-                    borderBottom: '1px solid var(--border-glass)',
-                    transition: 'var(--transition-smooth)'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.01)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <td style={{ padding: '1.25rem 1.5rem', fontWeight: 600, color: 'var(--color-gold)' }}>
-                    {e.entry_number || e.entryNumber}
-                  </td>
-                  <td style={{ padding: '1.25rem 1.5rem', color: 'var(--text-primary)' }}>
-                    {e.entry_date || e.entryDate}
-                  </td>
-                  <td style={{ padding: '1.25rem 1.5rem', fontFamily: 'monospace', color: 'var(--color-emerald)', fontWeight: 600 }}>
-                    {e.matter_id || e.matterCaseNumber}
-                  </td>
+              entries.map((entry: any, idx: number) => (
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border-glass)', transition: 'var(--transition-smooth)' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.01)'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}>
+                  <td style={{ padding: '1.25rem 1.5rem', fontWeight: 600, color: 'var(--color-gold)' }}>{entry.entry_number || entry.entryNumber}</td>
+                  <td style={{ padding: '1.25rem 1.5rem', color: 'var(--text-primary)' }}>{entry.entry_date || entry.entryDate}</td>
+                  <td style={{ padding: '1.25rem 1.5rem', fontFamily: 'monospace', color: 'var(--color-emerald)', fontWeight: 600 }}>{entry.matter_id || entry.matterCaseNumber}</td>
+                  <td style={{ padding: '1.25rem 1.5rem' }}>{entry.service_type || entry.serviceName}</td>
+                  <td style={{ padding: '1.25rem 1.5rem', fontWeight: 600 }}>{entry.main_party_name || entry.clientName}</td>
+                  <td style={{ padding: '1.25rem 1.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{entry.land_summary || entry.landSummary}</td>
+                  <td style={{ padding: '1.25rem 1.5rem' }}>{entry.notary_name || entry.notaryName}</td>
                   <td style={{ padding: '1.25rem 1.5rem' }}>
-                    {e.service_type || e.serviceName}
-                  </td>
-                  <td style={{ padding: '1.25rem 1.5rem', fontWeight: 600 }}>
-                    {e.main_party_name || e.clientName}
-                  </td>
-                  <td style={{ padding: '1.25rem 1.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {e.land_summary || e.landSummary}
-                  </td>
-                  <td style={{ padding: '1.25rem 1.5rem' }}>
-                    {e.notary_name || e.notaryName}
-                  </td>
-                  <td style={{ padding: '1.25rem 1.5rem' }}>
-                    <span className="badge badge-green" style={{ fontSize: '0.65rem' }}>
-                      {e.status}
-                    </span>
+                    <span className="badge badge-green" style={{ fontSize: '0.65rem' }}>{entry.status}</span>
                   </td>
                 </tr>
               ))
@@ -245,7 +201,6 @@ export default function ReportsRepertorium() {
           </tbody>
         </table>
       </div>
-
     </div>
   );
 }

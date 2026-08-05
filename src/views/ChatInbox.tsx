@@ -1,47 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { MessageSquare, Send, User, ChevronRight } from 'lucide-react';
-
-export function normalizeBodyText(bodyText: unknown): string {
-  if (typeof bodyText === 'string') return bodyText;
-  if (bodyText === null || bodyText === undefined) return '';
-  if (typeof bodyText === 'object') {
-    const obj = bodyText as Record<string, unknown>;
-    if (typeof obj.text === 'string') return obj.text;
-    if (typeof obj.content === 'string') return obj.content;
-    return JSON.stringify(bodyText);
-  }
-  return String(bodyText);
-}
+import { normalizeChatMessage, normalizeChatThread } from '../lib/communication';
+import type { ChatMessage, ChatThread } from '../lib/communication';
+import { useRealtimeStore } from '../store/realtime';
+import { MessageSquare, Send } from 'lucide-react';
+import { queryKeys } from '../lib/queryKeys';
 
 export default function ChatInbox() {
   const queryClient = useQueryClient();
-  const [activeThread, setActiveThread] = useState<any | null>(null);
+  const [activeThread, setActiveThread] = useState<ChatThread | null>(null);
   const [messageInput, setMessageInput] = useState('');
+  const fallbackEnabled = useRealtimeStore((state) => state.fallbackEnabled);
+  const fallbackIntervalMs = useRealtimeStore((state) => state.fallbackIntervalMs);
 
   // Fetch threads
-  const { data: threads = [], isLoading: isLoadingThreads } = useQuery({
-    queryKey: ['chat', 'threads'],
+  const { data: threads = [], isLoading: isLoadingThreads } = useQuery<ChatThread[]>({
+    queryKey: queryKeys.chatThreads(),
     queryFn: async () => {
       const res = await api.get('/api/v1/chat/threads');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const rows = Array.isArray(res.data) ? res.data : [];
+      return rows.map(normalizeChatThread);
     },
-    refetchInterval: 15000 // Refresh thread counts
+    refetchInterval: fallbackEnabled ? fallbackIntervalMs : false
   });
 
   const safeThreads = Array.isArray(threads) ? threads : [];
 
   // Fetch active thread's messages
-  const { data: messages = [], refetch: refetchMessages } = useQuery({
-    queryKey: ['chat', 'messages', activeThread?.matterId],
+  const { data: messages = [], refetch: refetchMessages } = useQuery<ChatMessage[]>({
+    queryKey: queryKeys.chatThread(activeThread?.threadId || activeThread?.matterId || 'inactive'),
     queryFn: async () => {
       if (!activeThread) return [];
       const res = await api.get(`/api/v1/matters/${activeThread.matterId}/chat/messages`);
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const rows = Array.isArray(res.data) ? res.data : [];
+      return rows.map(normalizeChatMessage);
     },
     enabled: !!activeThread,
-    refetchInterval: 5000 // Poll active chat
+    refetchInterval: fallbackEnabled ? fallbackIntervalMs : false
   });
 
   const safeMessages = Array.isArray(messages) ? messages : [];
@@ -52,7 +48,7 @@ export default function ChatInbox() {
       if (!activeThread) return;
       try {
         await api.post(`/api/v1/chat/threads/${activeThread.threadId}/read`);
-        queryClient.invalidateQueries({ queryKey: ['chat', 'threads'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.chatThreads() });
       } catch (err) {
         console.error('Failed to mark thread as read:', err);
       }
@@ -64,6 +60,7 @@ export default function ChatInbox() {
   const sendMessageMutation = useMutation({
     mutationFn: async (payload: { matterId: string; bodyText: string }) => {
       await api.post(`/api/v1/matters/${payload.matterId}/chat/messages`, {
+        messageType: 'text',
         bodyText: payload.bodyText
       });
     },
@@ -71,8 +68,8 @@ export default function ChatInbox() {
       setMessageInput('');
       refetchMessages();
       // Crucial requirements invalidations (AC-ADMIN-CHAT-04)
-      queryClient.invalidateQueries({ queryKey: ['chat', 'messages', activeThread?.matterId] });
-      queryClient.invalidateQueries({ queryKey: ['chat', 'threads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chatThread(activeThread?.threadId || activeThread?.matterId || 'inactive') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chatThreads() });
     }
   });
 
@@ -147,7 +144,7 @@ export default function ChatInbox() {
                       {t.counterpartyName}
                     </h4>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {normalizeBodyText(t.lastMessage) || 'Belum ada pesan.'}
+                      {t.lastMessage || 'Belum ada pesan.'}
                     </p>
                   </div>
                 );
@@ -186,7 +183,6 @@ export default function ChatInbox() {
                 ) : (
                   safeMessages.map((m: any) => {
                     const isMe = m.senderRole === 'ADMIN';
-                    const messageText = normalizeBodyText(m.bodyText);
                     
                     return (
                       <div 
@@ -212,7 +208,7 @@ export default function ChatInbox() {
                           fontSize: '0.85rem',
                           lineHeight: '1.4'
                         }}>
-                          {messageText}
+                          {m.bodyText}
                         </div>
 
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
