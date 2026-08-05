@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
@@ -14,660 +14,357 @@ import {
   LogOut,
   ChevronDown,
   Building,
-  Server,
   Sun,
   Moon,
   DollarSign,
   Settings,
-  BarChart3
+  BarChart3,
+  RefreshCcw,
 } from 'lucide-react';
-import { api, getApiBaseUrl, setApiBaseUrl, tokenManager } from '../api/client';
+import { api, type AppRole } from '../api/client';
+import { useAuth } from '../auth/AuthProvider';
+import { canAccess, getPrimaryAdminRole } from '../auth/access';
+import { normalizeChatThread, normalizeNotificationItem } from '../lib/communication';
+import type { ChatThread, NotificationItem } from '../lib/communication';
+import { useRealtimeStore } from '../store/realtime';
+import { useSettingsStore } from '../store/settings';
+import { queryKeys } from '../lib/queryKeys';
+import BlockingLoader from './BlockingLoader';
 
-// Guard: only run queries when a token is present
-function hasToken() {
-  return !!tokenManager.getSync('accessToken');
+type UpdaterState = Awaited<ReturnType<typeof window.electronAPI.app.getMeta>>['updater'];
+type TenantBranding = { name?: string; logoUrl?: string | null };
+
+function hasElectronApi() {
+  return typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
 }
 
-interface LayoutProps {
-  onLogout: () => void;
-}
+const navItems: Array<{
+  key: 'dashboard' | 'queue' | 'matters' | 'schedules' | 'chat' | 'escrow' | 'moderation' | 'reports' | 'invitations' | 'audit' | 'settings';
+  to: string;
+  label: string;
+  icon: React.ReactNode;
+}> = [
+  { key: 'dashboard', to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+  { key: 'queue', to: '/queue', label: 'Antrian Pengajuan', icon: <Inbox size={18} /> },
+  { key: 'matters', to: '/matters', label: 'Perkara', icon: <FileText size={18} /> },
+  { key: 'schedules', to: '/schedules', label: 'Agenda', icon: <Calendar size={18} /> },
+  { key: 'chat', to: '/chat', label: 'Komunikasi', icon: <MessageSquare size={18} /> },
+  { key: 'escrow', to: '/escrow', label: 'Escrow & Payout', icon: <DollarSign size={18} /> },
+  { key: 'moderation', to: '/moderation', label: 'Moderasi Chat', icon: <ShieldAlert size={18} /> },
+  { key: 'reports', to: '/reports/operational', label: 'Laporan', icon: <BarChart3 size={18} /> },
+  { key: 'invitations', to: '/invitations', label: 'Undangan Klien', icon: <UserPlus size={18} /> },
+  { key: 'audit', to: '/audit', label: 'Log Audit', icon: <History size={18} /> },
+  { key: 'settings', to: '/settings', label: 'Pengaturan', icon: <Settings size={18} /> },
+];
 
-export default function Layout({ onLogout }: LayoutProps) {
-  const location = useLocation();
+export default function Layout() {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const queryClient = useQueryClient();
-  
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showHostSettings, setShowHostSettings] = useState(false);
-  const [apiHost, setApiHost] = useState(getApiBaseUrl());
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('ajbku-theme') as 'light' | 'dark') || 'light');
+  const [updaterState, setUpdaterState] = useState<UpdaterState | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const tenantSettings = useSettingsStore((state) => state.getTenantSettings(user?.tenantId || 'tenant-id'));
+  const realtimeStatus = useRealtimeStore((state) => state.status);
+  const fallbackEnabled = useRealtimeStore((state) => state.fallbackEnabled);
+  const fallbackIntervalMs = useRealtimeStore((state) => state.fallbackIntervalMs);
 
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('ajbku-theme') as 'light' | 'dark') || 'light';
-  });
-
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(nextTheme);
-    localStorage.setItem('ajbku-theme', nextTheme);
-    document.documentElement.setAttribute('data-theme', nextTheme);
-  };
-
-  // State for user details
-  const [userProfile, setUserProfile] = useState<{ fullName: string; roleCode: string; email: string } | null>(null);
-  const [selectedOffice, setSelectedOffice] = useState<string>('off-1');
-
-  // Load user profile
   useEffect(() => {
-    async function loadUser() {
-      if (!hasToken()) return; // Don't fire without a valid token
-      try {
-        const res = await api.get('/api/v1/auth/me');
-        setUserProfile(res.data);
-      } catch (err) {
-        // Fallback jika /auth/me gagal
-        setUserProfile({
-          fullName: 'Admin Sari Wijaya',
-          roleCode: 'PRINCIPAL',
-          email: 'admin@notarissejahtera.com'
-        });
-      }
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('ajbku-theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (!hasElectronApi()) {
+      return undefined;
     }
-    loadUser();
+
+    window.electronAPI.app.getMeta().then((meta) => setUpdaterState(meta.updater)).catch(() => {
+      setUpdaterState(null);
+    });
+    const detach = window.electronAPI.app.onUpdaterState((state) => setUpdaterState(state));
+    return () => detach?.();
   }, []);
 
-  const tenantId = tokenManager.getSync('tenantId') || 'tenant-id';
+  const tenantId = user?.tenantId;
 
-  // Fetch offices
-  const { data: offices = [] } = useQuery({
+  const officesQuery = useQuery({
     queryKey: ['offices', tenantId],
-    enabled: hasToken() && tenantId !== 'tenant-id',
+    enabled: !!tenantId,
     queryFn: async () => {
-      const res = await api.get(`/api/v1/tenants/${tenantId}/offices`);
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
-    }
+      try {
+        const res = await api.get<Array<{ id: string; name: string }>>(`/api/v1/tenants/${tenantId}/offices`);
+        return Array.isArray(res.data) ? res.data : [];
+      } catch {
+        return [];
+      }
+    },
   });
 
-  const safeOffices = Array.isArray(offices) ? offices : [];
-
-  // Fetch notifications
-  const { data: notifications = [], refetch: refetchNotifs } = useQuery({
-    queryKey: ['notifications'],
-    enabled: hasToken(),
+  const tenantDetailsQuery = useQuery<TenantBranding>({
+    queryKey: queryKeys.tenantDetails(tenantId || 'tenant-id'),
+    enabled: !!tenantId,
     queryFn: async () => {
-      const res = await api.get('/api/v1/notifications');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const res = await api.get<TenantBranding>(`/api/v1/tenants/${tenantId}`);
+      return res.data;
     },
-    refetchInterval: 60000 // Poll every minute
   });
 
-  const safeNotifications = Array.isArray(notifications) ? notifications : [];
-
-  // Fetch chat threads to compute unread badges
-  const { data: chatThreads = [] } = useQuery({
-    queryKey: ['chat', 'threads'],
-    enabled: hasToken(),
+  const notificationsQuery = useQuery<NotificationItem[]>({
+    queryKey: queryKeys.notificationsList(),
+    enabled: !!tenantId,
     queryFn: async () => {
-      const res = await api.get('/api/v1/chat/threads');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      try {
+        const res = await api.get<Array<any>>('/api/v1/notifications');
+        const rows = Array.isArray(res.data) ? res.data : [];
+        return rows.map(normalizeNotificationItem);
+      } catch {
+        return [];
+      }
     },
-    refetchInterval: 15000 // Refresh thread counts
+    refetchInterval: fallbackEnabled ? fallbackIntervalMs : false,
   });
 
-  const safeChatThreads = Array.isArray(chatThreads) ? chatThreads : [];
-
-  const totalChatUnread = safeChatThreads.reduce((sum: number, t: any) => sum + (t?.unreadCount || 0), 0);
-  const unreadNotifications = safeNotifications.filter((n: any) => n && !n.isRead);
-
-  // Mutation to mark single notification read
-  const readNotificationMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.patch(`/api/v1/notifications/${id}/read`);
+  const chatThreadsQuery = useQuery<ChatThread[]>({
+    queryKey: queryKeys.chatThreads(),
+    enabled: !!tenantId && canAccess(user?.roles, 'chat'),
+    queryFn: async () => {
+      try {
+        const res = await api.get<Array<any>>('/api/v1/chat/threads');
+        const rows = Array.isArray(res.data) ? res.data : [];
+        return rows.map(normalizeChatThread);
+      } catch {
+        return [];
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    }
+    refetchInterval: fallbackEnabled ? fallbackIntervalMs : false,
   });
+
+  const flaggedQuery = useQuery({
+    queryKey: queryKeys.moderationFlaggedMessages(1, 25),
+    enabled: !!tenantId && canAccess(user?.roles, 'moderation'),
+    queryFn: async () => {
+      try {
+        const res = await api.get<Array<any>>('/api/v1/moderation/messages/flagged', { page: 1, perPage: 25 });
+        return Array.isArray(res.data) ? res.data : [];
+      } catch {
+        return [];
+      }
+    },
+    refetchInterval: fallbackEnabled ? fallbackIntervalMs : false,
+  });
+
+  const markNotificationRead = useMutation({
+    mutationFn: async (notificationId: string) => api.patch(`/api/v1/notifications/${notificationId}/read`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.notificationsList() }),
+  });
+
+  const unreadNotifications = (notificationsQuery.data || []).filter((item) => !item.isRead);
+  const totalChatUnread = (chatThreadsQuery.data || []).reduce((sum, thread) => sum + (thread.unreadCount || 0), 0);
+  const totalFlagged = (flaggedQuery.data || []).length;
+
+  const visibleNav = useMemo(
+    () => navItems.filter((item) => canAccess(user?.roles, item.key)),
+    [user?.roles]
+  );
+  const primaryRole = getPrimaryAdminRole(user?.roles);
+
+  const activeOfficeName =
+    tenantDetailsQuery.data?.name ||
+    tenantSettings.profile.officeName ||
+    (officesQuery.data?.find((office) => office.id === user?.officeId)?.name ?? officesQuery.data?.[0]?.name ?? 'Kantor Aktif');
+  const shellLogoUrl = tenantDetailsQuery.data?.logoUrl || tenantSettings.profile.logoPreview;
+
+  const badgeFor = (key: string) => {
+    if (key === 'chat') return totalChatUnread;
+    if (key === 'moderation') return totalFlagged;
+    return 0;
+  };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
-      await api.post('/api/v1/auth/logout');
-    } catch (e) {
-      // Ignore network errors on logout
+      await logout();
+      navigate({ to: '/login' });
+    } finally {
+      setIsLoggingOut(false);
     }
-    await tokenManager.clearAll();
-    onLogout();
-    navigate('/login');
   };
-
-  const saveBaseUrl = () => {
-    setApiBaseUrl(apiHost);
-    setShowHostSettings(false);
-    alert('Host API berhasil diperbarui. Memuat ulang...');
-    window.location.reload();
-  };
-
-  const role = userProfile?.roleCode || 'PRINCIPAL';
-
-  const showIntake = ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE'].includes(role);
-  const showMatters = ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE', 'FINANCE_ADMIN', 'MODERATION_OFFICER'].includes(role);
-  const showSchedules = ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE'].includes(role);
-  const showEscrow = ['PRINCIPAL', 'SUPER_ADMIN', 'FINANCE_ADMIN'].includes(role);
-  const showModeration = ['PRINCIPAL', 'SUPER_ADMIN', 'MODERATION_OFFICER'].includes(role);
-  const showAudit = ['PRINCIPAL', 'SUPER_ADMIN'].includes(role);
-  const showInvitations = ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE'].includes(role);
-  const showSettings = ['PRINCIPAL', 'SUPER_ADMIN'].includes(role);
-  const showReports = ['PRINCIPAL', 'SUPER_ADMIN', 'FINANCE_ADMIN'].includes(role);
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
-      
-      {/* Sidebar - Midnight Emerald Design */}
-      <aside className="glass-panel" style={{
-        width: '260px',
-        height: '100%',
-        borderRadius: '0',
-        borderTop: 'none',
-        borderBottom: 'none',
-        borderLeft: 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: 10
-      }}>
-        {/* Brand Header */}
-        <div style={{
-          padding: '1.75rem 1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          borderBottom: '1px solid var(--border-glass)'
-        }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, var(--color-emerald), var(--color-gold))',
-            boxShadow: 'var(--shadow-emerald-glow)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 'bold',
-            fontSize: '1.1rem',
-            color: '#fff'
-          }}>A</div>
+      {isLoggingOut ? (
+        <BlockingLoader
+          title="Mengakhiri Sesi Admin"
+          message="Session sedang ditutup dengan aman dan data akses lokal sedang dibersihkan."
+        />
+      ) : null}
+      <aside className="glass-panel" style={{ width: '260px', borderRadius: 0, borderTop: 'none', borderBottom: 'none', borderLeft: 'none', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '1.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid var(--border-glass)' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: shellLogoUrl ? `center / cover no-repeat url(${shellLogoUrl})` : 'linear-gradient(135deg, var(--color-emerald), var(--color-gold))', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700 }}>
+            {!shellLogoUrl ? 'A' : ''}
+          </div>
           <div>
-            <h1 style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-primary)' }}>
-              AJB<span style={{ color: 'var(--color-emerald)' }}>ku</span>.id
-            </h1>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Portal Operasional
-            </span>
+            <h1 style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-primary)' }}>AJB<span style={{ color: 'var(--color-emerald)' }}>ku</span>.id</h1>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Portal Operasional</span>
           </div>
         </div>
 
-        {/* Sidebar Menu Links (Dinamis berdasar Role) */}
         <nav style={{ flex: 1, padding: '1.5rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', overflowY: 'auto' }}>
-          
-          <SidebarLink to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" active={location.pathname === '/'} />
-          
-          {showIntake && (
-            <SidebarLink to="/queue" icon={<Inbox size={18} />} label="Antrian Pengajuan" active={location.pathname === '/queue'} />
-          )}
-          
-          {showMatters && (
-            <SidebarLink to="/matters" icon={<FileText size={18} />} label="Perkara" active={location.pathname.startsWith('/matters') && !location.pathname.endsWith('/verify')} />
-          )}
-          
-          {showSchedules && (
-            <SidebarLink to="/schedules" icon={<Calendar size={18} />} label="Agenda" active={location.pathname === '/schedules'} />
-          )}
-
-          {showEscrow && (
-            <SidebarLink to="/escrow" icon={<DollarSign size={18} />} label="Escrow & Payout" active={location.pathname === '/escrow'} />
-          )}
-          
-          {showModeration && (
-            <SidebarLink to="/moderation" icon={<ShieldAlert size={18} />} label="Moderasi Chat" active={location.pathname === '/moderation'} />
-          )}
-
-          {showReports && (
-            <SidebarLink to="/reports/operational" icon={<BarChart3 size={18} />} label="Laporan" active={location.pathname.startsWith('/reports')} />
-          )}
-          
-          {showInvitations && (
-            <SidebarLink to="/invitations" icon={<UserPlus size={18} />} label="Undangan Klien" active={location.pathname === '/invitations'} />
-          )}
-
-          {showAudit && (
-            <SidebarLink to="/audit" icon={<History size={18} />} label="Log Audit" active={location.pathname === '/audit'} />
-          )}
-
-          {showSettings && (
-            <SidebarLink to="/settings" icon={<Settings size={18} />} label="Pengaturan" active={location.pathname === '/settings'} />
-          )}
-
+          {visibleNav.map((item) => (
+            <SidebarLink key={item.to} to={item.to} icon={item.icon} label={item.label} active={pathname === item.to || (item.to !== '/' && pathname.startsWith(item.to))} badgeCount={badgeFor(item.key)} />
+          ))}
         </nav>
 
-        {/* Sidebar Footer – Backend Host Settings */}
-        <div style={{
-          padding: '1rem',
-          borderTop: '1px solid var(--border-glass)',
-          background: 'rgba(0, 0, 0, 0.15)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.5rem'
-        }}>
-          <button
-            onClick={() => setShowHostSettings(!showHostSettings)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              fontSize: '0.75rem',
-              padding: '0'
-            }}
-          >
-            <Server size={13} />
-            <span style={{ textDecoration: 'underline' }}>
-              {showHostSettings ? 'Tutup Pengaturan' : getApiBaseUrl()}
-            </span>
-          </button>
-
-          {showHostSettings && (
-            <div className="glass-panel" style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <input
-                type="text"
-                value={apiHost}
-                onChange={(e) => setApiHost(e.target.value)}
-                className="input-field"
-                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-              />
-              <button onClick={saveBaseUrl} className="btn btn-primary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px' }}>
-                Simpan & Reload
-              </button>
+        {updaterState?.message && (
+          <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--border-glass)', fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+              <span>{updaterState.message}</span>
+              {updaterState.status === 'downloaded' ? (
+                <button className="btn btn-primary" style={{ padding: '0.3rem 0.65rem', fontSize: '0.7rem' }} onClick={() => void window.electronAPI?.app.restartToUpdate()}>
+                  Restart & Update
+                </button>
+              ) : updaterState.status === 'idle' ? (
+                <button className="btn btn-secondary" style={{ padding: '0.3rem 0.65rem', fontSize: '0.7rem' }} onClick={() => void window.electronAPI?.app.checkForUpdates()}>
+                  <RefreshCcw size={12} />
+                </button>
+              ) : null}
             </div>
-          )}
+          </div>
+        )}
+        <div style={{ padding: '0.55rem 1rem', borderTop: '1px solid var(--border-glass)', fontSize: '0.7rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)' }}>
+          Sinkronisasi: {fallbackEnabled ? `polling ${Math.round(fallbackIntervalMs / 1000)} detik` : realtimeStatus}
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        
-        {/* Topbar */}
-        <header className="glass-panel" style={{
-          height: '70px',
-          borderRadius: '0',
-          borderTop: 'none',
-          borderRight: 'none',
-          borderLeft: 'none',
-          padding: '0 2rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          zIndex: 9
-        }}>
-          {/* Breadcrumbs / Page Title */}
+        <header className="glass-panel" style={{ height: '70px', borderRadius: 0, borderTop: 'none', borderRight: 'none', borderLeft: 'none', padding: '0 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 80, overflow: 'visible' }}>
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Beranda</span>
             <span style={{ margin: '0 0.5rem', color: 'var(--text-muted)' }}>/</span>
-            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {getBreadcrumbText(location.pathname)}
-            </span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{getBreadcrumbText(pathname)}</span>
           </div>
 
-          {/* User Controls Panel */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            
-            {/* Active Office Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-input-field)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
               <Building size={16} style={{ color: 'var(--color-emerald)' }} />
-              <select 
-                value={selectedOffice} 
-                onChange={(e) => setSelectedOffice(e.target.value)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
-                  outline: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                {safeOffices.length > 0 ? (
-                  safeOffices.map((o: any) => (
-                    <option key={o.id} value={o.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                      {o.name}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="off-1" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Notaris Sejahtera Madiun</option>
-                    <option value="off-2" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>PPAT Sukses Surabaya</option>
-                  </>
-                )}
-              </select>
+              <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{activeOfficeName}</span>
             </div>
 
-            {/* Theme Toggle Button */}
-            <button 
-              onClick={toggleTheme}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'var(--transition-smooth)'
-              }}
-              className="glass-panel-interactive"
-              title={theme === 'light' ? 'Aktifkan Mode Gelap' : 'Aktifkan Mode Terang'}
-            >
+            <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="glass-panel-interactive" style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '0.5rem', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
             </button>
 
-            {/* Notification Bell with Badge */}
             <div style={{ position: 'relative' }}>
-              <button 
-                onClick={() => { setShowNotifications(!showNotifications); setShowProfileMenu(false); }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  padding: '0.5rem',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'var(--transition-smooth)'
-                }}
-                className="glass-panel-interactive"
-              >
+              <button onClick={() => { setShowNotifications((value) => !value); setShowProfileMenu(false); }} className="glass-panel-interactive" style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '0.5rem', borderRadius: '50%', display: 'grid', placeItems: 'center', position: 'relative' }}>
                 <Bell size={20} />
-                {unreadNotifications.length > 0 && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '2px',
-                    right: '2px',
-                    backgroundColor: 'var(--color-crimson)',
-                    color: '#fff',
-                    fontSize: '0.65rem',
-                    fontWeight: 700,
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 0 5px rgba(239, 68, 68, 0.5)'
-                  }}>
-                    {unreadNotifications.length}
-                  </span>
-                )}
+                {unreadNotifications.length > 0 && <span style={{ position: 'absolute', top: '2px', right: '2px', backgroundColor: 'var(--color-crimson)', color: '#fff', fontSize: '0.65rem', fontWeight: 700, width: '18px', height: '18px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>{unreadNotifications.length}</span>}
               </button>
 
-              {/* Glassy Notification Panel Dropdown */}
               {showNotifications && (
-                <div className="glass-panel animate-fade-in" style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: '0',
-                  marginTop: '0.75rem',
-                  width: '350px',
-                  maxHeight: '400px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                  zIndex: 20
-                }}>
-                  <div style={{
-                    padding: '1rem',
-                    borderBottom: '1px solid var(--border-glass)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    background: 'rgba(0,0,0,0.1)'
-                  }}>
-                    <h3 style={{ fontSize: '0.95rem', fontWeight: 600 }}>Notifikasi</h3>
-                    <button 
-                      onClick={async () => {
-                        // Tandai semua notifikasi sebagai dibaca
-                        for (const n of unreadNotifications) {
-                          await readNotificationMutation.mutateAsync(n.id);
-                        }
-                      }}
-                      style={{ background: 'none', border: 'none', color: 'var(--color-emerald)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 500 }}
-                    >
-                      Tandai Semua Dibaca
-                    </button>
-                  </div>
-                  <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    {safeNotifications.length === 0 ? (
-                      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                        Tidak ada notifikasi baru
-                      </div>
-                    ) : (
-                      safeNotifications.map((n: any) => (
-                        <div 
-                          key={n.id} 
-                          onClick={() => {
-                            if (!n.isRead) readNotificationMutation.mutate(n.id);
-                            setShowNotifications(false);
-                            if (n.matterId) navigate(`/matters/${n.matterId}`);
-                          }}
-                          style={{
-                            padding: '1rem',
-                            borderBottom: '1px solid var(--border-glass)',
-                            cursor: 'pointer',
-                            backgroundColor: n.isRead ? 'transparent' : 'rgba(16, 185, 129, 0.05)',
-                            transition: 'var(--transition-smooth)',
-                            display: 'flex',
-                            gap: '0.75rem'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = n.isRead ? 'transparent' : 'rgba(16, 185, 129, 0.05)'}
-                        >
-                          <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: n.isRead ? 'transparent' : 'var(--color-emerald)',
-                            marginTop: '4px',
-                            flexShrink: 0
-                          }} />
-                          <div>
-                            <h4 style={{ fontSize: '0.85rem', fontWeight: n.isRead ? 500 : 600, color: 'var(--text-primary)', marginBottom: '0.2rem' }}>
-                              {n.title}
-                            </h4>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.25' }}>
-                              {n.body}
-                            </p>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.4rem', display: 'block' }}>
-                              {new Date(n.createdAt).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
+                <div className="glass-panel animate-fade-in" style={{ position: 'absolute', top: '100%', right: 0, marginTop: '0.75rem', width: '360px', maxHeight: '420px', overflow: 'hidden', zIndex: 120 }}>
+                  <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-glass)', fontWeight: 600 }}>Notifikasi</div>
+                  <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                    {notificationsQuery.data?.length ? notificationsQuery.data.map((notification) => (
+                      <button
+                        key={notification.id}
+                        type="button"
+                        onClick={() => {
+                          if (!notification.isRead) {
+                            markNotificationRead.mutate(notification.id);
+                          }
+                          setShowNotifications(false);
+                          if (notification.actionPath) {
+                            navigate({ to: notification.actionPath as any });
+                            return;
+                          }
+                          if (notification.matterId) {
+                            navigate({ to: '/matters/$id', params: { id: notification.matterId } });
+                          }
+                        }}
+                        style={{ width: '100%', textAlign: 'left', padding: '1rem', background: notification.isRead ? 'transparent' : 'rgba(16, 185, 129, 0.05)', border: 'none', borderBottom: '1px solid var(--border-glass)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                      >
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{notification.title}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{notification.body}</div>
+                      </button>
+                    )) : <div style={{ padding: '1.25rem', color: 'var(--text-muted)' }}>Tidak ada notifikasi.</div>}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Profile Dropdown */}
             <div style={{ position: 'relative' }}>
-              <button 
-                onClick={() => { setShowProfileMenu(!showProfileMenu); setShowNotifications(false); }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.4rem 0.8rem',
-                  borderRadius: '8px'
-                }}
-                className="glass-panel-interactive"
-              >
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'var(--color-emerald-hover)',
-                  color: '#fff',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.9rem'
-                }}>
-                  {userProfile?.fullName.slice(0, 2).toUpperCase() || 'AD'}
-                </div>
-                <div style={{ textAlign: 'left', display: 'none', flexDirection: 'column' } /* shown on larger displays */}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{userProfile?.fullName}</span>
+              <button onClick={() => { setShowProfileMenu((value) => !value); setShowNotifications(false); }} className="glass-panel-interactive" style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--color-emerald-hover)', color: '#fff', fontWeight: 600, display: 'grid', placeItems: 'center' }}>
+                  {user?.fullName?.slice(0, 2).toUpperCase() || 'AD'}
                 </div>
                 <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />
               </button>
 
               {showProfileMenu && (
-                <div className="glass-panel animate-fade-in" style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: '0',
-                  marginTop: '0.75rem',
-                  width: '220px',
-                  padding: '0.5rem',
-                  zIndex: 20
-                }}>
+                <div className="glass-panel animate-fade-in" style={{ position: 'absolute', top: '100%', right: 0, marginTop: '0.75rem', width: '220px', padding: '0.5rem', zIndex: 120 }}>
                   <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-glass)' }}>
-                    <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{userProfile?.fullName}</p>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{userProfile?.email}</p>
-                    <span className="badge badge-teal" style={{ marginTop: '0.4rem', fontSize: '0.65rem' }}>{userProfile?.roleCode}</span>
+                    <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>{user?.fullName}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user?.email}</p>
+                    <span className="badge badge-teal" style={{ marginTop: '0.4rem', fontSize: '0.65rem' }}>{primaryRole || 'NO_ADMIN_ROLE'}</span>
                   </div>
-                  
-                  <button 
-                    onClick={handleLogout}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--color-crimson)',
-                      fontFamily: 'var(--font-sans)',
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                      borderRadius: '6px',
-                      marginTop: '0.25rem',
-                      transition: 'var(--transition-smooth)'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
+                  <button type="button" onClick={handleLogout} style={{ width: '100%', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'none', border: 'none', color: 'var(--color-crimson)', fontSize: '0.9rem', cursor: 'pointer' }}>
                     <LogOut size={16} />
                     Keluar Sesi
                   </button>
                 </div>
               )}
             </div>
-
           </div>
         </header>
 
-        {/* Content Outlet */}
-        <main style={{ flex: 1, padding: '2rem', overflowY: 'auto', background: 'radial-gradient(ellipse at bottom, var(--bg-secondary) 0%, var(--bg-primary) 100%)' }}>
+        <main style={{ flex: 1, padding: '2rem', overflowY: 'auto', background: 'radial-gradient(ellipse at bottom, var(--bg-secondary) 0%, var(--bg-primary) 100%)', position: 'relative', zIndex: 1 }}>
           <Outlet />
         </main>
       </div>
-
     </div>
   );
 }
 
-// SidebarLink helper component
-interface SidebarLinkProps {
+function SidebarLink({
+  to,
+  icon,
+  label,
+  active,
+  badgeCount,
+}: {
   to: string;
   icon: React.ReactNode;
   label: string;
   active: boolean;
   badgeCount?: number;
-}
-
-function SidebarLink({ to, icon, label, active, badgeCount }: SidebarLinkProps) {
+}) {
   return (
-    <Link 
-      to={to} 
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0.8rem 1.2rem',
-        borderRadius: '8px',
-        color: active ? 'var(--sidebar-active-text)' : 'var(--text-secondary)',
-        background: active ? 'var(--sidebar-active-bg)' : 'transparent',
-        border: active ? '1px solid var(--sidebar-active-border)' : '1px solid transparent',
-        textDecoration: 'none',
-        fontWeight: active ? 600 : 500,
-        fontFamily: 'var(--font-sans)',
-        fontSize: '0.95rem',
-        transition: 'var(--transition-smooth)'
-      }}
-      className={active ? '' : 'sidebar-link-hover'}
-    >
+    <Link to={to} className={active ? '' : 'sidebar-link-hover'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.8rem 1.2rem', borderRadius: '8px', color: active ? 'var(--sidebar-active-text)' : 'var(--text-secondary)', background: active ? 'var(--sidebar-active-bg)' : 'transparent', border: active ? '1px solid var(--sidebar-active-border)' : '1px solid transparent', textDecoration: 'none', fontWeight: active ? 600 : 500, fontSize: '0.95rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         <span style={{ color: active ? 'var(--color-emerald)' : 'var(--text-muted)' }}>{icon}</span>
         <span>{label}</span>
       </div>
-      
-      {badgeCount !== undefined && badgeCount > 0 && (
-        <span style={{
-          backgroundColor: 'var(--color-emerald)',
-          color: '#fff',
-          fontSize: '0.7rem',
-          fontWeight: 700,
-          padding: '0.1rem 0.45rem',
-          borderRadius: '10px',
-          boxShadow: 'var(--shadow-emerald-glow)'
-        }}>
-          {badgeCount}
-        </span>
-      )}
-      
-      {/* Inject custom hover style tag directly in body if not done */}
-      <style>{`
-        .sidebar-link-hover:hover {
-          background: var(--sidebar-hover-bg);
-          color: var(--text-primary);
-          border-color: var(--sidebar-hover-border);
-        }
-      `}</style>
+      {badgeCount ? <span style={{ backgroundColor: 'var(--color-emerald)', color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '10px' }}>{badgeCount}</span> : null}
+      <style>{`.sidebar-link-hover:hover { background: var(--sidebar-hover-bg); color: var(--text-primary); border-color: var(--sidebar-hover-border); }`}</style>
     </Link>
   );
 }
 
-// Mapper to get breadcrumb text from path
-function getBreadcrumbText(pathname: string): string {
+function getBreadcrumbText(pathname: string) {
   if (pathname === '/') return 'Dashboard';
-  if (pathname === '/queue') return 'Antrian Pengajuan';
-  if (pathname === '/matters') return 'Perkara';
-  if (pathname.startsWith('/matters/')) return 'Detail Perkara';
-  if (pathname === '/schedules') return 'Agenda';
-  if (pathname === '/chat') return 'Komunikasi';
-  if (pathname === '/moderation') return 'Moderasi';
-  if (pathname === '/audit') return 'Log Audit';
-  if (pathname === '/invitations') return 'Undangan Staf';
+  if (pathname.startsWith('/queue')) return 'Antrian Pengajuan';
+  if (pathname.startsWith('/matters')) return 'Perkara';
+  if (pathname.startsWith('/schedules')) return 'Agenda';
+  if (pathname.startsWith('/chat')) return 'Komunikasi';
+  if (pathname.startsWith('/moderation')) return 'Moderasi';
+  if (pathname.startsWith('/audit')) return 'Log Audit';
+  if (pathname.startsWith('/invitations')) return 'Undangan Klien';
+  if (pathname.startsWith('/settings')) return 'Pengaturan';
+  if (pathname.startsWith('/reports')) return 'Laporan';
+  if (pathname.startsWith('/escrow')) return 'Escrow & Payout';
   return 'Halaman';
 }
