@@ -273,7 +273,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantSettingsDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -282,6 +289,104 @@
           }
         ],
         "summary": "Detail tenant",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      },
+      "patch": {
+        "operationId": "TenantController_updateTenant",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTenantSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update tenant settings",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      },
+      "put": {
+        "operationId": "TenantController_replaceTenant",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTenantSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Replace tenant settings",
         "tags": [
           "tenants"
         ],
@@ -325,6 +430,438 @@
           "ADMIN_OFFICE",
           "ADMIN_INTAKE",
           "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}/users": {
+      "get": {
+        "operationId": "TenantController_listUsers",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantUserItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List internal users per tenant",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}/notaries": {
+      "get": {
+        "operationId": "TenantController_listNotaries",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantNotaryItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List tenant notary coverage settings",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "ADMIN_INTAKE"
+        ]
+      },
+      "put": {
+        "operationId": "TenantController_replaceNotaries",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertTenantNotariesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantNotaryItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Upsert tenant notary coverage settings",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "ADMIN_INTAKE"
+        ]
+      },
+      "patch": {
+        "operationId": "TenantController_patchNotaries",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertTenantNotariesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantNotaryItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Patch tenant notary coverage settings",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "ADMIN_INTAKE"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}/rates": {
+      "get": {
+        "operationId": "TenantController_getRates",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantRatesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get tenant rate settings for calculator and pricing",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "FINANCE_ADMIN"
+        ]
+      },
+      "put": {
+        "operationId": "TenantController_replaceRates",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertTenantRatesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantRatesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Upsert tenant rate settings",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "FINANCE_ADMIN"
+        ]
+      },
+      "patch": {
+        "operationId": "TenantController_patchRates",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertTenantRatesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantRatesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Patch tenant rate settings",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "FINANCE_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}/logo/presign": {
+      "post": {
+        "operationId": "TenantController_presignLogoUpload",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignTenantLogoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Generate tenant logo upload URL",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}/logo/complete": {
+      "post": {
+        "operationId": "TenantController_completeLogoUpload",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteTenantLogoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Finalize tenant logo upload and persist canonical reference",
+        "tags": [
+          "tenants"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
         ]
       }
     },
@@ -584,7 +1121,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Matter detail including deduplicated documents. documents[] contains one active document per document_type + party_role and includes latestVersion metadata when available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatterDetailResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -720,6 +1264,7 @@
     },
     "/api/v1/matters/{matterId}/documents/presign": {
       "post": {
+        "description": "Returns a private S3-compatible presigned PUT URL for Cloudflare R2/MinIO. The frontend must upload the binary file directly to upload.url without sending an Authorization header, then call the complete endpoint with upload.key.",
         "operationId": "DocumentController_createPresign",
         "parameters": [
           {
@@ -743,7 +1288,20 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Presigned upload URL generated. upload.token is always null for S3-compatible storage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignDocumentResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "FORMAT_NOT_SUPPORTED, FILE_TOO_LARGE, atau INVALID_DOCUMENT_TYPE"
+          },
+          "409": {
+            "description": "DOCUMENT_ALREADY_UPLOADED: document for this matter/docType is already uploaded, under review, or verified."
           }
         },
         "security": [
@@ -751,7 +1309,7 @@
             "access-token": []
           }
         ],
-        "summary": "Generate pre-signed upload URL dokumen",
+        "summary": "Generate S3-compatible pre-signed upload URL dokumen",
         "tags": [
           "documents"
         ],
@@ -766,6 +1324,7 @@
     },
     "/api/v1/matters/{matterId}/documents/{documentId}/complete": {
       "post": {
+        "description": "Marks the document as uploaded only after the object exists in S3-compatible storage. Send storageKey from the presign response upload.key.",
         "operationId": "DocumentController_completeUpload",
         "parameters": [
           {
@@ -797,7 +1356,10 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Upload completed and document version created."
+          },
+          "422": {
+            "description": "STORAGE_OBJECT_NOT_FOUND: object with the provided storageKey does not exist in S3-compatible storage."
           }
         },
         "security": [
@@ -875,7 +1437,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "S3-compatible presigned GET URL for document download.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedDownloadResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -904,7 +1473,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "S3-compatible presigned GET URL for document download.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedDownloadResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1721,7 +2297,17 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Always returns 200 with an array. Empty state is [].",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationItemDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1750,7 +2336,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationReadResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1759,6 +2352,40 @@
           }
         ],
         "summary": "Tandai notifikasi sudah dibaca",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "post": {
+        "operationId": "NotificationController_markReadAlias",
+        "parameters": [
+          {
+            "name": "notificationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationReadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Alias kompatibilitas untuk tandai notifikasi sudah dibaca",
         "tags": [
           "notifications"
         ]
@@ -2679,6 +3306,371 @@
           "name"
         ]
       },
+      "TenantSettingsDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "address": {
+            "type": "object"
+          },
+          "phone": {
+            "type": "object"
+          },
+          "logoUrl": {
+            "type": "object"
+          },
+          "logoStorageKey": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdateTenantSettingsDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "AJBKu Jakarta Selatan"
+          },
+          "address": {
+            "type": "string",
+            "example": "Jl. TB Simatupang No. 10, Jakarta Selatan"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+62-21-555-0101"
+          },
+          "logoUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/tenant-assets/logo.png",
+            "description": "Optional absolute logo URL. Official private-storage flow should use logo upload endpoints and then pass logoStorageKey instead."
+          },
+          "logoStorageKey": {
+            "type": "string",
+            "example": "tenant_abc12345/assets/20260629T101010Z_logo.png",
+            "description": "Canonical private-storage reference returned by the logo upload flow. If provided, backend will derive logoUrl from storage."
+          }
+        }
+      },
+      "TenantUserItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "object"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "officeId": {
+            "type": "object"
+          },
+          "officeName": {
+            "type": "object"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastLoginAt": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "fullName",
+          "status",
+          "roles"
+        ]
+      },
+      "TenantNotaryCoverageAreaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cityCode": {
+            "type": "string"
+          },
+          "provinceCode": {
+            "type": "string"
+          },
+          "coverageType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "cityCode",
+          "provinceCode",
+          "coverageType"
+        ]
+      },
+      "TenantNotaryItemDto": {
+        "type": "object",
+        "properties": {
+          "notaryProfileId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "object"
+          },
+          "phone": {
+            "type": "object"
+          },
+          "licenseNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "acceptsNewAssignment": {
+            "type": "boolean"
+          },
+          "appointmentCityCode": {
+            "type": "object"
+          },
+          "appointmentProvinceCode": {
+            "type": "object"
+          },
+          "coverageAreas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantNotaryCoverageAreaDto"
+            }
+          }
+        },
+        "required": [
+          "notaryProfileId",
+          "userId",
+          "fullName",
+          "licenseNumber",
+          "status",
+          "acceptsNewAssignment",
+          "coverageAreas"
+        ]
+      },
+      "NotaryCoverageAreaDto": {
+        "type": "object",
+        "properties": {
+          "cityCode": {
+            "type": "string",
+            "example": "3174"
+          },
+          "provinceCode": {
+            "type": "string",
+            "example": "31"
+          },
+          "coverageType": {
+            "type": "string",
+            "example": "legal_authority",
+            "enum": [
+              "legal_authority",
+              "service_area"
+            ]
+          }
+        },
+        "required": [
+          "cityCode",
+          "provinceCode",
+          "coverageType"
+        ]
+      },
+      "UpsertTenantNotaryItemDto": {
+        "type": "object",
+        "properties": {
+          "notaryProfileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "acceptsNewAssignment": {
+            "type": "boolean",
+            "example": true
+          },
+          "status": {
+            "type": "string",
+            "example": "active",
+            "enum": [
+              "active",
+              "inactive",
+              "suspended"
+            ]
+          },
+          "coverageAreas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotaryCoverageAreaDto"
+            }
+          }
+        },
+        "required": [
+          "notaryProfileId",
+          "coverageAreas"
+        ]
+      },
+      "UpsertTenantNotariesDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpsertTenantNotaryItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "TenantRatesDto": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "baseFee": {
+            "type": "object"
+          },
+          "njoptkp": {
+            "type": "object"
+          },
+          "bphtbRate": {
+            "type": "object"
+          },
+          "pphRate": {
+            "type": "object"
+          },
+          "certificateCheckFee": {
+            "type": "object"
+          },
+          "transferNameFee": {
+            "type": "object"
+          },
+          "extraRates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpsertTenantRatesDto": {
+        "type": "object",
+        "properties": {
+          "baseFee": {
+            "type": "number",
+            "example": 2500000
+          },
+          "njoptkp": {
+            "type": "number",
+            "example": 80000000
+          },
+          "bphtbRate": {
+            "type": "number",
+            "example": 5
+          },
+          "pphRate": {
+            "type": "number",
+            "example": 2.5
+          },
+          "certificateCheckFee": {
+            "type": "number",
+            "example": 500000
+          },
+          "transferNameFee": {
+            "type": "number",
+            "example": 1500000
+          },
+          "extraRates": {
+            "type": "object",
+            "example": {
+              "validationFee": 250000,
+              "witnessFee": 100000
+            }
+          }
+        }
+      },
+      "PresignTenantLogoDto": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "example": "logo-ajbku.png"
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/png"
+          }
+        },
+        "required": [
+          "fileName",
+          "mimeType"
+        ]
+      },
+      "CompleteTenantLogoDto": {
+        "type": "object",
+        "properties": {
+          "storageKey": {
+            "type": "string",
+            "example": "tenant_abc12345/assets/20260629T101010Z_logo.png"
+          }
+        },
+        "required": [
+          "storageKey"
+        ]
+      },
       "InviteUserDto": {
         "type": "object",
         "properties": {
@@ -2831,6 +3823,235 @@
           "updated_at"
         ]
       },
+      "MatterDocumentLatestVersionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "storage_key": {
+            "type": "string"
+          },
+          "original_filename": {
+            "type": "string"
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "file_size_bytes": {
+            "type": "number"
+          },
+          "version_number": {
+            "type": "number"
+          },
+          "ocr_status": {
+            "type": "string"
+          },
+          "watermark_status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "storage_key",
+          "original_filename",
+          "mime_type",
+          "file_size_bytes",
+          "version_number",
+          "ocr_status",
+          "watermark_status",
+          "created_at"
+        ]
+      },
+      "MatterDocumentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "matter_id": {
+            "type": "string"
+          },
+          "owner_client_profile_id": {
+            "type": "object",
+            "nullable": true
+          },
+          "document_type": {
+            "type": "string"
+          },
+          "party_role": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "buyer",
+              "seller",
+              "applicant",
+              "heir",
+              "spouse",
+              "witness",
+              "consultant"
+            ]
+          },
+          "latest_version_id": {
+            "type": "object",
+            "nullable": true
+          },
+          "verification_status": {
+            "type": "string"
+          },
+          "visibility_scope": {
+            "type": "string"
+          },
+          "rejection_reason": {
+            "type": "object",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "latestVersion": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatterDocumentLatestVersionDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "matter_id",
+          "document_type",
+          "verification_status",
+          "visibility_scope",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "MatterDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "office_id": {
+            "type": "string"
+          },
+          "client_profile_id": {
+            "type": "string"
+          },
+          "service_category_id": {
+            "type": "string"
+          },
+          "matter_number": {
+            "type": "object",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "land_city_code": {
+            "type": "object",
+            "nullable": true
+          },
+          "land_province_code": {
+            "type": "object",
+            "nullable": true
+          },
+          "land_certificate_number": {
+            "type": "object",
+            "nullable": true
+          },
+          "transaction_value": {
+            "type": "object"
+          },
+          "workflow_status": {
+            "type": "string"
+          },
+          "assignment_status": {
+            "type": "string"
+          },
+          "payment_status": {
+            "type": "string"
+          },
+          "bpn_validation_status": {
+            "type": "string"
+          },
+          "signing_status": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "serviceCategory": {
+            "type": "object",
+            "nullable": true
+          },
+          "parties": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "timelines": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatterDocumentDto"
+            }
+          },
+          "assignmentDecisions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "office_id",
+          "client_profile_id",
+          "service_category_id",
+          "title",
+          "workflow_status",
+          "assignment_status",
+          "payment_status",
+          "bpn_validation_status",
+          "signing_status",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "parties",
+          "timelines",
+          "documents",
+          "assignmentDecisions"
+        ]
+      },
       "WorkflowStatus": {
         "type": "string",
         "enum": [
@@ -2898,7 +4119,33 @@
         "type": "object",
         "properties": {
           "docType": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "ktp",
+              "kk",
+              "npwp",
+              "pbb",
+              "sppt_pbb",
+              "sertifikat",
+              "surat_nikah",
+              "surat_cerai",
+              "akta_kelahiran",
+              "akta_draft",
+              "akta_final",
+              "sk_ahli_waris",
+              "sppht",
+              "bphtb",
+              "pph",
+              "lainnya",
+              "other",
+              "ktp-penjual",
+              "ktp-pembeli",
+              "kk-penjual",
+              "kk-pembeli",
+              "npwp-penjual",
+              "npwp-pembeli"
+            ],
+            "description": "Document type. Compatibility aliases: sppt_pbb -> pbb, other -> lainnya, and legacy party-specific aliases like ktp-penjual map to documentType + partyRole."
           },
           "fileName": {
             "type": "string"
@@ -2908,6 +4155,33 @@
           },
           "fileSize": {
             "type": "number"
+          },
+          "ownerClientProfileId": {
+            "type": "string",
+            "description": "Optional owner client profile UUID for document ownership scoping. Primarily for compatibility with older clients."
+          },
+          "visibilityScope": {
+            "type": "string",
+            "enum": [
+              "client_only",
+              "staff_only",
+              "assigned_notary",
+              "finance",
+              "all_matter_internal"
+            ]
+          },
+          "partyRole": {
+            "type": "string",
+            "enum": [
+              "buyer",
+              "seller",
+              "applicant",
+              "heir",
+              "spouse",
+              "witness",
+              "consultant"
+            ],
+            "description": "Optional role of the party this document belongs to. Uniqueness is enforced per matterId + documentType + partyRole."
           }
         },
         "required": [
@@ -2917,9 +4191,96 @@
           "fileSize"
         ]
       },
+      "PresignedUploadDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "example": "documents"
+          },
+          "key": {
+            "type": "string",
+            "example": "tenant_b7f9c2a1/matter_e2d42bde/e638f949-e0ad-4837-ae8e-ce30728c424a_20260625T101530Z/ktp_seller_20260625T101530Z_ktp-penjual.pdf"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "PUT"
+            ],
+            "example": "PUT"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://297cf09c6ea9fea43f98dcf846fa9567.r2.cloudflarestorage.com/documents/tenant_b7f9c2a1/matter_e2d42bde/e638f949-e0ad-4837-ae8e-ce30728c424a_20260625T101530Z/ktp_seller_20260625T101530Z_ktp-penjual.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&...",
+            "description": "S3-compatible presigned PUT URL. Frontend must upload the file directly to this URL without an Authorization header."
+          },
+          "token": {
+            "type": "string",
+            "nullable": true,
+            "example": null,
+            "description": "Always null for S3-compatible storage because credentials are embedded in the signed URL query parameters."
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 900
+          }
+        },
+        "required": [
+          "bucket",
+          "key",
+          "method",
+          "url",
+          "token",
+          "expiresIn"
+        ]
+      },
+      "PresignDocumentResponseDto": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "example": "document-uuid"
+          },
+          "upload": {
+            "$ref": "#/components/schemas/PresignedUploadDto"
+          }
+        },
+        "required": [
+          "documentId",
+          "upload"
+        ]
+      },
       "CompleteDocumentUploadDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "storageKey": {
+            "type": "string",
+            "example": "tenant_b7f9c2a1/matter_e2d42bde/e638f949-e0ad-4837-ae8e-ce30728c424a_20260625T101530Z/ktp_seller_20260625T101530Z_ktp-penjual.pdf",
+            "description": "Object key returned by the presign endpoint. The object must exist in S3-compatible storage before complete is accepted."
+          },
+          "originalFilename": {
+            "type": "string",
+            "example": "ktp-client.pdf"
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "application/pdf"
+          },
+          "fileSizeBytes": {
+            "type": "number",
+            "example": 452188
+          },
+          "checksumSha256": {
+            "type": "string",
+            "example": "sha256-hex-digest"
+          }
+        },
+        "required": [
+          "storageKey",
+          "originalFilename",
+          "mimeType",
+          "fileSizeBytes"
+        ]
       },
       "VerifyDocumentDto": {
         "type": "object",
@@ -2946,6 +4307,41 @@
         },
         "required": [
           "verificationStatus"
+        ]
+      },
+      "PresignedDownloadResponseDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "example": "documents"
+          },
+          "key": {
+            "type": "string",
+            "example": "tenant_b7f9c2a1/matter_e2d42bde/e638f949-e0ad-4837-ae8e-ce30728c424a_20260625T101530Z/ktp_seller_20260625T101530Z_ktp-penjual.pdf"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET"
+            ],
+            "example": "GET"
+          },
+          "url": {
+            "type": "string",
+            "description": "S3-compatible presigned GET URL for document download."
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 3600
+          }
+        },
+        "required": [
+          "bucket",
+          "key",
+          "method",
+          "url",
+          "expiresIn"
         ]
       },
       "DecideAssignmentDto": {
@@ -3269,6 +4665,83 @@
           "stepCode"
         ]
       },
+      "NotificationItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "notif_01"
+          },
+          "type": {
+            "type": "string",
+            "example": "bpn_step_updated"
+          },
+          "title": {
+            "type": "string",
+            "example": "Status BPN diperbarui"
+          },
+          "body": {
+            "type": "string",
+            "example": "Tahap BPN untuk matter Anda telah diperbarui."
+          },
+          "isRead": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Tahap BPN untuk matter Anda telah diperbarui.",
+            "description": "Compatibility alias for body."
+          },
+          "read": {
+            "type": "boolean",
+            "example": false,
+            "description": "Compatibility alias for isRead."
+          },
+          "matterId": {
+            "type": "object",
+            "example": "1c6d2a84-8e5a-4a2a-9ef0-3d2b5e1c9f77",
+            "nullable": true
+          },
+          "actionLabel": {
+            "type": "object",
+            "example": "Buka matter",
+            "nullable": true
+          },
+          "actionPath": {
+            "type": "object",
+            "example": "/matters/1c6d2a84-8e5a-4a2a-9ef0-3d2b5e1c9f77",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-26T07:30:00.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "body",
+          "isRead",
+          "message",
+          "read",
+          "createdAt"
+        ]
+      },
+      "NotificationReadResponseDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
       "ChatMessageDto": {
         "type": "object",
         "properties": {
@@ -3283,6 +4756,18 @@
           "senderUserId": {
             "type": "string",
             "example": "usr_01"
+          },
+          "senderName": {
+            "type": "string",
+            "example": "Admin Utama ABC"
+          },
+          "senderRole": {
+            "type": "string",
+            "enum": [
+              "client",
+              "notary",
+              "staff"
+            ]
           },
           "messageType": {
             "type": "string",
@@ -3323,6 +4808,8 @@
           "id",
           "threadId",
           "senderUserId",
+          "senderName",
+          "senderRole",
           "messageType",
           "isFlagged",
           "isBlocked",
@@ -3530,9 +5017,7 @@
           "messageType": {
             "type": "string",
             "enum": [
-              "text",
-              "file",
-              "system"
+              "text"
             ],
             "default": "text"
           }
