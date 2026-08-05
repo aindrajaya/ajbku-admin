@@ -1,22 +1,31 @@
 {
-  "name": "dashboard",
+  "name": "ajbku-admin",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "AJBku Admin Desktop Dashboard",
+  "author": "AJBku",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
     "preview": "vite preview",
     "electron:start": "electron .",
-    "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && npm run electron:start\"",
-    "dist": "npm run build && electron-builder"
+    "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5174 && npm run electron:start\"",
+    "dist": "npm run build && electron-builder",
+    "package:win": "npm run build && electron-builder --win nsis --x64"
   },
   "build": {
-    "appId": "com.ajbku.dashboard",
-    "productName": "AJBku Dashboard",
+    "appId": "id.ajbku.admin",
+    "productName": "AJBku Admin",
+    "copyright": "Copyright (c) 2026 AJBku",
+    "asar": true,
+    "compression": "maximum",
     "directories": {
-      "output": "dist-electron"
+      "output": "dist-electron-build",
+      "buildResources": "build-resources"
     },
     "files": [
       "dist/**/*",
@@ -24,26 +33,56 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "AJBku-Admin-Setup-${version}.${ext}",
+      "executableName": "AJBku Admin",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AJBku Admin",
+      "artifactName": "AJBku-Admin-Installer-${version}.${ext}",
+      "uninstallDisplayName": "AJBku Admin"
     }
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "@tailwindcss/vite": "^4.3.1",
     "@tanstack/react-query": "^5.100.14",
+    "@tanstack/react-router": "^1.170.16",
+    "@tanstack/router-devtools": "^1.167.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "axios": "^1.16.1",
     "electron-store": "^11.0.2",
+    "electron-updater": "^6.8.9",
+    "jsdom": "^29.1.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.17.0",
+    "pdfjs-dist": "^6.0.227",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.16.0"
+    "react-router-dom": "^7.16.0",
+    "recharts": "^3.9.0",
+    "tailwindcss": "^4.3.1",
+    "vitest": "^4.1.9",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

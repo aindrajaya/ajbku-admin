@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 /docs
+/dist-electron-build
+/build-resources
+/test-results
