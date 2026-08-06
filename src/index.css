@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
   /* Default: Premium Light Mode */
@@ -154,6 +154,79 @@ body {
 
 #root {
   height: 100%;
+}
+
+.auth-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  padding: 1.5rem 1rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: radial-gradient(circle at center, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  padding: 2.5rem;
+  margin-block: auto;
+  flex-shrink: 0;
+}
+
+.auth-card-header {
+  text-align: center;
+  margin-bottom: 2.25rem;
+}
+
+.auth-role-list {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 640px) {
+  .auth-shell {
+    padding: 1rem 0.75rem;
+  }
+
+  .auth-card {
+    padding: 1.5rem;
+  }
+
+  .auth-card-header {
+    margin-bottom: 1.5rem;
+  }
+}
+
+@media (max-height: 760px) {
+  .auth-shell {
+    align-items: flex-start;
+  }
+
+  .auth-card {
+    margin-block: 0;
+  }
+
+  .auth-card-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .auth-role-list {
+    margin-top: 0.75rem;
+  }
+}
+
+@media (max-height: 640px) {
+  .auth-card {
+    padding: 1.25rem;
+  }
 }
 
 /* Glassmorphism Panel */
@@ -351,3 +424,4 @@ body {
 .animate-slide-in-right {
   animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+

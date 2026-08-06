@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { ShieldCheck, Lock, Mail, Building, Key } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
@@ -96,15 +96,15 @@ export default function Login() {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100vw', background: 'radial-gradient(circle at center, var(--bg-secondary) 0%, var(--bg-primary) 100%)' }}>
+    <div className="auth-shell">
       {loading ? (
         <BlockingLoader
           title={isTotpStep ? 'Memverifikasi Admin' : 'Masuk ke Dashboard Admin'}
           message={isTotpStep ? 'Kode authenticator sedang diverifikasi. Mohon tunggu sebentar.' : 'Kredensial admin sedang diperiksa dan sesi aman sedang disiapkan.'}
         />
       ) : null}
-      <div className="glass-panel animate-fade-in" style={{ width: '420px', padding: '2.5rem', boxShadow: 'var(--shadow-premium), var(--shadow-emerald-glow)', border: '1px solid var(--border-glass-active)' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2.25rem' }}>
+      <div className="glass-panel animate-fade-in auth-card" style={{ boxShadow: 'var(--shadow-premium), var(--shadow-emerald-glow)', border: '1px solid var(--border-glass-active)' }}>
+        <div className="auth-card-header">
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.7rem', marginBottom: '1rem', borderRadius: '999px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.22)', color: 'var(--color-emerald-hover)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Admin Desktop
           </div>
@@ -118,7 +118,7 @@ export default function Login() {
             {isTotpStep ? 'Masukkan kode TOTP dari aplikasi authenticator Anda sebelum session admin penuh dibuat.' : 'Akses khusus staf internal untuk operasional admin desktop. Bukan untuk klien atau workspace eksternal.'}
           </p>
           {!isTotpStep && (
-            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1rem' }}>
+            <div className="auth-role-list">
               {['ADMIN_INTAKE', 'ADMIN_OFFICE', 'FINANCE_ADMIN', 'PRINCIPAL', 'MODERATION_OFFICER'].map((role) => (
                 <span
                   key={role}
@@ -203,3 +203,4 @@ export default function Login() {
     </div>
   );
 }
+
