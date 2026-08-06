@@ -33,12 +33,17 @@ const ReportsOperational = lazy(() => import('./views/ReportsOperational'));
 const ReportsRepertorium = lazy(() => import('./views/ReportsRepertorium'));
 const Settings = lazy(() => import('./views/Settings'));
 
+function logRouteRedirect(reason: string, details?: Record<string, unknown>) {
+  console.info('[auth] route-redirect', { reason, ...(details || {}) });
+}
+
 function ProtectedLayout() {
   const { status } = useAuth();
   if (status === 'booting') {
     return <div className="grid h-screen place-items-center text-emerald-500">Memuat AJBku...</div>;
   }
   if (status === 'anonymous' || status === 'credential-authenticated') {
+    logRouteRedirect('protected-layout-blocked', { status });
     return <Navigate to="/auth/login" replace />;
   }
   return (
@@ -51,6 +56,7 @@ function ProtectedLayout() {
 function LoginRoute() {
   const { status } = useAuth();
   if (status === 'authenticated') {
+    logRouteRedirect('login-route-blocked', { status });
     return <Navigate to="/" replace />;
   }
   return <Login />;

@@ -57,7 +57,19 @@ export default function Login() {
         await navigate({ to: '/auth/totp' });
       }
     } catch (err: any) {
-      setError(err?.message?.includes('401') || err?.response?.status === 401 ? 'Kredensial atau kode kantor salah.' : 'Gagal terhubung ke server.');
+      const message = typeof err?.message === 'string' ? err.message : '';
+      const statusCode = err?.response?.status;
+      console.info('[auth] login-ui-error', {
+        statusCode: statusCode ?? null,
+        message: message || null,
+      });
+      if (message.includes('401') || statusCode === 401) {
+        setError('Kredensial atau kode kantor salah.');
+      } else if (message) {
+        setError(message);
+      } else {
+        setError('Gagal terhubung ke server.');
+      }
     } finally {
       setLoading(false);
     }

@@ -9,6 +9,10 @@ const DEV_SERVER_URL = 'http://localhost:5174';
 const API_BASE_URL = 'https://net-lauren-aindrajaya-5a2990e1.koyeb.app';
 const DEV_SERVER_ORIGINS = `${DEV_SERVER_URL} http://127.0.0.1:5174`;
 
+function logAuthDiagnostic(event, details = {}) {
+  console.info(`[auth] ${event}`, details);
+}
+
 function ensureDirectory(targetPath) {
   if (!fs.existsSync(targetPath)) {
     fs.mkdirSync(targetPath, { recursive: true });
@@ -140,6 +144,83 @@ function buildApiUrl(baseUrl, requestPath, params) {
   return target.toString();
 }
 
+function unwrapApiPayload(raw) {
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    Object.prototype.hasOwnProperty.call(raw, 'data') &&
+    Object.prototype.hasOwnProperty.call(raw, 'error')
+  ) {
+    return raw.data;
+  }
+
+  return raw;
+}
+
+function extractApiErrorMessage(raw, fallbackMessage) {
+  const payload = unwrapApiPayload(raw);
+
+  if (payload && typeof payload === 'object' && payload.message) {
+    return String(payload.message);
+  }
+
+  if (raw && typeof raw === 'object' && raw.error) {
+    if (typeof raw.error === 'string') {
+      return raw.error;
+    }
+
+    if (typeof raw.error === 'object' && raw.error.message) {
+      return String(raw.error.message);
+    }
+  }
+
+  return fallbackMessage;
+}
+
+function hasResponseBody(raw) {
+  if (raw === null || raw === undefined) {
+    return false;
+  }
+
+  if (typeof raw === 'string') {
+    return raw.trim().length > 0;
+  }
+
+  return true;
+}
+
+function isSerializableUser(user) {
+  return !!(
+    user &&
+    typeof user === 'object' &&
+    typeof user.id === 'string' &&
+    typeof user.email === 'string'
+  );
+}
+
+function sanitizeStoredSession(sessionValue) {
+  if (
+    !sessionValue ||
+    typeof sessionValue !== 'object' ||
+    typeof sessionValue.accessToken !== 'string' ||
+    !isSerializableUser(sessionValue.user)
+  ) {
+    return null;
+  }
+
+  return {
+    accessToken: sessionValue.accessToken,
+    refreshToken: typeof sessionValue.refreshToken === 'string' ? sessionValue.refreshToken : null,
+    tenantCode: typeof sessionValue.tenantCode === 'string' ? sessionValue.tenantCode : '',
+    apiBaseUrl: typeof sessionValue.apiBaseUrl === 'string' ? sessionValue.apiBaseUrl : API_BASE_URL,
+    user: sessionValue.user,
+    tokenExpiresAt:
+      typeof sessionValue.tokenExpiresAt === 'number' && Number.isFinite(sessionValue.tokenExpiresAt)
+        ? sessionValue.tokenExpiresAt
+        : null,
+  };
+}
+
 function readSecureSession() {
   try {
     if (!fs.existsSync(secureSessionPath)) {
@@ -190,7 +271,7 @@ function clearAuthSession() {
 }
 
 function getPublicSession() {
-  if (!authSession) {
+  if (!authSession?.accessToken || !authSession?.user) {
     return {
       status: 'anonymous',
       user: null,
@@ -222,31 +303,55 @@ async function rawJsonFetch(targetUrl, options = {}) {
 
 async function refreshAuthSession(baseUrl) {
   if (!authSession?.refreshToken) {
+    logAuthDiagnostic('refresh-skipped', {
+      reason: 'missing-refresh-token',
+    });
     clearAuthSession();
     return null;
   }
 
   try {
-    const { response, data } = await rawJsonFetch(`${baseUrl}/api/v1/auth/refresh`, {
+    const requestUrl = `${baseUrl}/api/v1/auth/refresh`;
+    const { response, data } = await rawJsonFetch(requestUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken: authSession.refreshToken }),
     });
+    const payload = unwrapApiPayload(data);
+
+    logAuthDiagnostic('refresh-response', {
+      url: requestUrl,
+      method: 'POST',
+      status: response.status,
+      hasBody: hasResponseBody(data),
+      accessTokenReturned: typeof payload?.accessToken === 'string',
+    });
 
     if (!response.ok) {
-      throw new Error(`Refresh failed with status ${response.status}.`);
+      throw new Error(extractApiErrorMessage(data, `Refresh failed with status ${response.status}.`));
+    }
+
+    if (typeof payload?.accessToken !== 'string') {
+      throw new Error('Refresh response did not include an access token.');
     }
 
     authSession = {
       ...authSession,
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      tokenExpiresAt: Date.now() + ((data.expiresIn || 15 * 60) * 1000),
+      accessToken: payload.accessToken,
+      refreshToken: typeof payload.refreshToken === 'string' ? payload.refreshToken : authSession.refreshToken,
+      tokenExpiresAt: Date.now() + (((payload.expiresIn) || 15 * 60) * 1000),
       apiBaseUrl: baseUrl,
     };
     writeSecureSession(authSession);
+    logAuthDiagnostic('refresh-stored', {
+      tokenStored: typeof authSession.accessToken === 'string',
+      tokenReadBack: !!sanitizeStoredSession(readSecureSession())?.accessToken,
+    });
     return authSession;
   } catch (error) {
+    logAuthDiagnostic('refresh-failed', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     clearAuthSession();
     notifyRendererLogout();
     return null;
@@ -277,7 +382,8 @@ async function performAuthorizedApiRequest({ method, url, params, body, retrying
     headers.Authorization = `Bearer ${authSession.accessToken}`;
   }
 
-  const { response, data } = await rawJsonFetch(buildApiUrl(resolvedBaseUrl, url, params), {
+  const targetUrl = buildApiUrl(resolvedBaseUrl, url, params);
+  const { response, data } = await rawJsonFetch(targetUrl, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -301,7 +407,7 @@ async function performAuthorizedApiRequest({ method, url, params, body, retrying
     data,
     error: response.ok
       ? null
-      : (data && typeof data === 'object' && data.message) || `Request failed with status ${response.status}.`,
+      : extractApiErrorMessage(data, `Request failed with status ${response.status}.`),
   };
 }
 
@@ -405,6 +511,7 @@ function setupIpcHandlers() {
     async (_, { tenantCode, email, password }) => {
       try {
         const baseUrl = API_BASE_URL;
+        const requestUrl = `${baseUrl}/api/v1/auth/login`;
 
         store.set(
           'prefs.savedTenantCode',
@@ -412,7 +519,7 @@ function setupIpcHandlers() {
         );
 
         const { response, data } = await rawJsonFetch(
-          `${baseUrl}/api/v1/auth/login`,
+          requestUrl,
           {
             method: 'POST',
             headers: {
@@ -425,50 +532,78 @@ function setupIpcHandlers() {
             }),
           },
         );
+        const payload = unwrapApiPayload(data);
+
+        logAuthDiagnostic('login-response', {
+          url: requestUrl,
+          method: 'POST',
+          status: response.status,
+          hasBody: hasResponseBody(data),
+          accessTokenReturned: typeof payload?.accessToken === 'string',
+          userReturned: isSerializableUser(payload?.user),
+          needsTotp: payload?.needsTotp === true,
+          apiError: response.ok ? null : extractApiErrorMessage(data, 'Login gagal.'),
+        });
 
         if (!response.ok) {
           return {
             ok: false,
             status: response.status,
-            error:
-              (
-                data &&
-                typeof data === 'object' &&
-                data.message
-              ) ||
-              'Login gagal.',
+            error: extractApiErrorMessage(data, 'Login gagal.'),
           };
         }
 
-        if (data.needsTotp) {
+        if (payload?.needsTotp) {
           pendingAuthChallenge = {
-            accessToken: data.accessToken,
-            refreshToken: data.refreshToken,
+            accessToken: payload.accessToken,
+            refreshToken: payload.refreshToken,
             tenantCode,
-            user: data.user,
+            user: payload.user,
             apiBaseUrl: baseUrl,
           };
 
           return {
             ok: true,
             status: 'totp_required',
-            user: data.user,
+            user: payload.user,
             tenantCode,
           };
         }
 
+        if (typeof payload?.accessToken !== 'string' || !isSerializableUser(payload?.user)) {
+          logAuthDiagnostic('login-invalid-payload', {
+            url: requestUrl,
+            method: 'POST',
+            status: response.status,
+            accessTokenReturned: typeof payload?.accessToken === 'string',
+            userReturned: isSerializableUser(payload?.user),
+          });
+          return {
+            ok: false,
+            status: response.status,
+            error: 'Respons login server tidak lengkap.',
+          };
+        }
+
         setAuthSession({
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
+          accessToken: payload.accessToken,
+          refreshToken: payload.refreshToken,
           tenantCode,
           apiBaseUrl: baseUrl,
-          user: data.user,
+          user: payload.user,
           tokenExpiresAt:
             Date.now() +
-            ((data.expiresIn || 15 * 60) * 1000),
+            (((payload.expiresIn) || 15 * 60) * 1000),
         });
 
         pendingAuthChallenge = null;
+        const storedSession = sanitizeStoredSession(readSecureSession());
+
+        logAuthDiagnostic('login-stored-session', {
+          tokenStored: !!storedSession?.accessToken,
+          tokenReadBack: !!storedSession?.accessToken,
+          sessionRestorable: !!storedSession?.user,
+        });
 
         return {
           ok: true,
@@ -476,7 +611,12 @@ function setupIpcHandlers() {
           session: getPublicSession(),
         };
       } catch (error) {
-        console.error('Login request failed:', error);
+        logAuthDiagnostic('login-request-failed', {
+          message: error instanceof Error ? error.message : String(error),
+          code: error?.code || null,
+          responseStatus: error?.response?.status || null,
+          hasResponseBody: hasResponseBody(error?.response?.data),
+        });
 
         return {
           ok: false,
@@ -490,10 +630,14 @@ function setupIpcHandlers() {
 
   ipcMain.handle('auth:verify-totp', async (_, { otp }) => {
     if (!pendingAuthChallenge) {
+      logAuthDiagnostic('totp-missing-challenge', {
+        reason: 'pending-challenge-missing',
+      });
       return { ok: false, error: 'Pending auth challenge is missing.' };
     }
 
-    const { response, data } = await rawJsonFetch(`${API_BASE_URL}/api/v1/auth/totp/verify`, {
+    const requestUrl = `${API_BASE_URL}/api/v1/auth/totp/verify`;
+    const { response, data } = await rawJsonFetch(requestUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -501,24 +645,41 @@ function setupIpcHandlers() {
         otp,
       }),
     });
+    const payload = unwrapApiPayload(data);
 
-    if (!response.ok || !data.verified) {
+    logAuthDiagnostic('totp-response', {
+      url: requestUrl,
+      method: 'POST',
+      status: response.status,
+      hasBody: hasResponseBody(data),
+      verified: payload?.verified === true,
+      accessTokenReturned: typeof payload?.accessToken === 'string',
+      apiError: response.ok ? null : extractApiErrorMessage(data, 'Kode TOTP tidak valid.'),
+    });
+
+    if (!response.ok || !payload?.verified) {
       return {
         ok: false,
         status: response.status,
-        error: (data && typeof data === 'object' && data.message) || 'Kode TOTP tidak valid.',
+        error: extractApiErrorMessage(data, 'Kode TOTP tidak valid.'),
       };
     }
 
     setAuthSession({
-      accessToken: data.accessToken || pendingAuthChallenge.accessToken,
-      refreshToken: data.refreshToken || pendingAuthChallenge.refreshToken,
+      accessToken: payload.accessToken || pendingAuthChallenge.accessToken,
+      refreshToken: payload.refreshToken || pendingAuthChallenge.refreshToken,
       tenantCode: pendingAuthChallenge.tenantCode,
       apiBaseUrl: API_BASE_URL,
       user: pendingAuthChallenge.user,
-      tokenExpiresAt: Date.now() + ((data.expiresIn || 15 * 60) * 1000),
+      tokenExpiresAt: Date.now() + (((payload.expiresIn) || 15 * 60) * 1000),
     });
     pendingAuthChallenge = null;
+    const storedSession = sanitizeStoredSession(readSecureSession());
+    logAuthDiagnostic('totp-stored-session', {
+      tokenStored: !!storedSession?.accessToken,
+      tokenReadBack: !!storedSession?.accessToken,
+      sessionRestorable: !!storedSession?.user,
+    });
     return {
       ok: true,
       session: getPublicSession(),
@@ -529,7 +690,14 @@ function setupIpcHandlers() {
     if (authSession) {
       await ensureFreshAuthSession(API_BASE_URL);
     }
-    return getPublicSession();
+    const sessionState = getPublicSession();
+    logAuthDiagnostic('session-restored', {
+      status: sessionState.status,
+      hasUser: !!sessionState.user,
+      tenantCode: sessionState.tenantCode || '',
+      completed: true,
+    });
+    return sessionState;
   });
 
   ipcMain.handle('auth:refresh-session', async () => {
@@ -693,7 +861,8 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
-  const savedSession = readSecureSession();
+  const rawSavedSession = readSecureSession();
+  const savedSession = sanitizeStoredSession(rawSavedSession);
 
   if (
     savedSession?.apiBaseUrl &&
@@ -704,6 +873,11 @@ app.whenReady().then(() => {
       savedSession.apiBaseUrl,
     );
 
+    clearAuthSession();
+  } else if (!savedSession && rawSavedSession) {
+    logAuthDiagnostic('session-cleared', {
+      reason: 'invalid-stored-session-shape',
+    });
     clearAuthSession();
   } else {
     authSession = savedSession;
