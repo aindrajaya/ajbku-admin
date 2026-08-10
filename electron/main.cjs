@@ -5,9 +5,10 @@ const Store = require('electron-store').default;
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const APP_RUNTIME_NAME = isDev ? 'AJBku Admin Dev' : 'AJBku Admin';
-const DEV_SERVER_URL = 'http://localhost:5174';
-const API_BASE_URL = 'https://net-lauren-aindrajaya-5a2990e1.koyeb.app';
-const DEV_SERVER_ORIGINS = `${DEV_SERVER_URL} http://127.0.0.1:5174`;
+const DEV_SERVER_URL = 'http://localhost:5175';
+// const API_BASE_URL = 'https://net-lauren-aindrajaya-5a2990e1.koyeb.app';
+const API_BASE_URL = 'http://localhost:3000';
+const DEV_SERVER_ORIGINS = `${DEV_SERVER_URL} http://127.0.0.1:5175`;
 
 function logAuthDiagnostic(event, details = {}) {
   console.info(`[auth] ${event}`, details);
@@ -474,7 +475,7 @@ function setupSecurityHeaders() {
         `style-src 'self' 'unsafe-inline' ${DEV_SERVER_ORIGINS} https://fonts.googleapis.com; ` +
         "font-src 'self' data: https://fonts.gstatic.com; " +
         `img-src 'self' data: blob: ${DEV_SERVER_ORIGINS} https:; ` +
-        "connect-src 'self' http://127.0.0.1:3000 http://localhost:3000 http://localhost:5174 http://127.0.0.1:5174 ws://localhost:5174 ws://127.0.0.1:5174 https: ws: wss:; " +
+        "connect-src 'self' http://127.0.0.1:3000 http://localhost:3000 http://localhost:5175 http://127.0.0.1:5175 ws://localhost:5175 ws://127.0.0.1:5175 https: ws: wss:; " +
         `frame-src 'self' blob: ${DEV_SERVER_ORIGINS} https:; ` +
         "object-src 'none'; base-uri 'self'; form-action 'self';"
       : "default-src 'self'; " +
