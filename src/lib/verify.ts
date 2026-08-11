@@ -1,4 +1,71 @@
 export type VerifyDocType = 'ktp' | 'npwp' | 'sertifikat' | 'pbb' | 'kk' | 'lainnya';
+export type VerifyPartyRole = 'seller' | 'buyer';
+export type VerifyDocumentKey =
+  | 'ktp:seller'
+  | 'ktp:buyer'
+  | 'npwp:seller'
+  | 'npwp:buyer'
+  | 'kk:seller'
+  | 'kk:buyer'
+  | 'sertifikat'
+  | 'pbb'
+  | 'lainnya';
+
+export type VerifyDocumentTab = {
+  key: VerifyDocumentKey;
+  docType: VerifyDocType;
+  partyRole?: VerifyPartyRole;
+  label: string;
+};
+
+export const verifyDocumentTabs: VerifyDocumentTab[] = [
+  { key: 'ktp:seller', docType: 'ktp', partyRole: 'seller', label: 'KTP Penjual' },
+  { key: 'ktp:buyer', docType: 'ktp', partyRole: 'buyer', label: 'KTP Pembeli' },
+  { key: 'npwp:seller', docType: 'npwp', partyRole: 'seller', label: 'NPWP Penjual' },
+  { key: 'npwp:buyer', docType: 'npwp', partyRole: 'buyer', label: 'NPWP Pembeli' },
+  { key: 'kk:seller', docType: 'kk', partyRole: 'seller', label: 'KK Penjual' },
+  { key: 'kk:buyer', docType: 'kk', partyRole: 'buyer', label: 'KK Pembeli' },
+  { key: 'sertifikat', docType: 'sertifikat', label: 'Sertifikat' },
+  { key: 'pbb', docType: 'pbb', label: 'PBB' },
+  { key: 'lainnya', docType: 'lainnya', label: 'Lainnya' },
+];
+
+export function normalizeVerifyDocType(value: unknown): VerifyDocType | '' {
+  const raw = String(value || '').toLowerCase().trim().replace(/\s+/g, '_').replace(/-/g, '_');
+  if (!raw) return '';
+  if (raw === 'sppt_pbb' || raw.includes('pbb')) return 'pbb';
+  if (raw === 'other' || raw === 'lain_lain' || raw === 'lainnya') return 'lainnya';
+  if (raw.includes('ktp')) return 'ktp';
+  if (raw.includes('npwp')) return 'npwp';
+  if (raw.includes('kk') || raw.includes('kartu_keluarga') || raw.includes('family_card')) return 'kk';
+  if (raw.includes('sertifikat') || raw.includes('certificate')) return 'sertifikat';
+  return '';
+}
+
+export function normalizeVerifyPartyRole(value: unknown): VerifyPartyRole | undefined {
+  const raw = String(value || '').toLowerCase().trim().replace(/\s+/g, '_').replace(/-/g, '_');
+  if (!raw) return undefined;
+  if (raw.includes('seller') || raw.includes('penjual')) return 'seller';
+  if (raw.includes('buyer') || raw.includes('pembeli')) return 'buyer';
+  return undefined;
+}
+
+export function buildVerifyDocumentKey(docType: VerifyDocType, partyRole?: VerifyPartyRole): VerifyDocumentKey {
+  if (['ktp', 'npwp', 'kk'].includes(docType)) {
+    return `${docType}:${partyRole || 'seller'}` as VerifyDocumentKey;
+  }
+  return docType as VerifyDocumentKey;
+}
+
+export function normalizeVerifyDocumentKey(value: unknown): VerifyDocumentKey | '' {
+  const raw = String(value || '').toLowerCase().trim();
+  if (!raw) return '';
+  const normalized = raw.replace(/\s+/g, '_').replace(/-/g, '_');
+  const [typePart, rolePart] = normalized.includes(':') ? normalized.split(':') : [normalized, normalized];
+  const docType = normalizeVerifyDocType(typePart);
+  if (!docType) return '';
+  return buildVerifyDocumentKey(docType, normalizeVerifyPartyRole(rolePart || normalized));
+}
 
 export const verifyDocFields: Record<VerifyDocType, Array<{ key: string; label: string; required?: boolean }>> = {
   ktp: [
@@ -47,6 +114,13 @@ export function createInitialVerifyForms() {
   } as Record<VerifyDocType, Record<string, string>>;
 }
 
+export function createInitialVerifyDocumentForms() {
+  const baseForms = createInitialVerifyForms();
+  return Object.fromEntries(
+    verifyDocumentTabs.map((tab) => [tab.key, { ...baseForms[tab.docType] }])
+  ) as Record<VerifyDocumentKey, Record<string, string>>;
+}
+
 export function validateVerifyForm(docType: VerifyDocType, values: Record<string, string>) {
   const nextErrors: Record<string, string> = {};
   const fields = verifyDocFields[docType];
@@ -72,8 +146,8 @@ export function isVerifyFormValid(docType: VerifyDocType, values: Record<string,
   return Object.keys(validateVerifyForm(docType, values)).length === 0;
 }
 
-export function buildVerifyDraftKey(matterId: string, docType: VerifyDocType, scopeKey: string) {
-  return `ajbku-draft-${scopeKey}-${matterId}-${docType}`;
+export function buildVerifyDraftKey(matterId: string, docKey: VerifyDocumentKey, scopeKey: string) {
+  return `ajbku-draft-${scopeKey}-${matterId}-${docKey}`;
 }
 
 export function buildVerifySplitKey(scopeKey: string) {

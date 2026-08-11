@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildVerifyDraftKey, isVerifyFormValid, validateVerifyForm } from './verify';
+import { buildVerifyDraftKey, isVerifyFormValid, normalizeVerifyDocumentKey, normalizeVerifyDocType, normalizeVerifyPartyRole, validateVerifyForm } from './verify';
 
 describe('verify helpers', () => {
   it('rejects KTP NIK shorter than 16 digits', () => {
@@ -24,6 +24,18 @@ describe('verify helpers', () => {
   });
 
   it('builds draft keys scoped by user and matter', () => {
-    expect(buildVerifyDraftKey('matter-1', 'ktp', 'admin-1')).toBe('ajbku-draft-admin-1-matter-1-ktp');
+    expect(buildVerifyDraftKey('matter-1', 'ktp:seller', 'admin-1')).toBe('ajbku-draft-admin-1-matter-1-ktp:seller');
+  });
+
+  it('normalizes backend document type aliases used by the viewer', () => {
+    expect(normalizeVerifyDocType('npwp')).toBe('npwp');
+    expect(normalizeVerifyDocType('kartu-keluarga')).toBe('kk');
+    expect(normalizeVerifyDocType('sppt_pbb')).toBe('pbb');
+    expect(normalizeVerifyDocType('other')).toBe('lainnya');
+    expect(normalizeVerifyPartyRole('penjual')).toBe('seller');
+    expect(normalizeVerifyPartyRole('pembeli')).toBe('buyer');
+    expect(normalizeVerifyDocumentKey('ktp-penjual')).toBe('ktp:seller');
+    expect(normalizeVerifyDocumentKey('npwp-pembeli')).toBe('npwp:buyer');
+    expect(normalizeVerifyDocumentKey('kk:buyer')).toBe('kk:buyer');
   });
 });
