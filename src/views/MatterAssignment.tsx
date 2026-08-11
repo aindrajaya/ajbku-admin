@@ -4,21 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, MapPin, UserCheck } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
+import { getAssignmentDocumentIssues } from '../lib/assignmentEligibility';
 import { notifyError, notifySuccess } from '../store/ui';
-
-const CORE_DOC_TYPES = ['ktp', 'npwp', 'sertifikat', 'pbb', 'kk'];
-
-function normalizeDocumentType(value: unknown) {
-  const raw = String(value || '').toLowerCase();
-  if (raw === 'sppt_pbb') return 'pbb';
-  if (raw === 'other') return 'lainnya';
-  if (raw.includes('ktp')) return 'ktp';
-  if (raw.includes('kk')) return 'kk';
-  if (raw.includes('npwp')) return 'npwp';
-  if (raw.includes('pbb')) return 'pbb';
-  if (raw.includes('sertifikat')) return 'sertifikat';
-  return raw;
-}
 
 export default function MatterAssignment() {
   const { id: matterId } = useParams({ strict: false }) as { id: string };
@@ -35,21 +22,12 @@ export default function MatterAssignment() {
   });
 
   const matter = matterQuery.data;
-  const rawDocuments = Array.isArray((matter as any)?.documents) ? (matter as any).documents : [];
-  const documents = rawDocuments.map((doc: any) => ({
-    type: normalizeDocumentType(doc.docType || doc.documentType || doc.document_type),
-    status: String(doc.status || doc.verificationStatus || doc.verification_status || '').toLowerCase(),
-  }));
-
-  const hasUnvalidatedCoreDocs = useMemo(() => {
-    const uploadedCoreDocs = documents.filter((doc: { type: string; status: string }) => CORE_DOC_TYPES.includes(doc.type));
-    if (!uploadedCoreDocs.length) return true;
-    return uploadedCoreDocs.some((doc: { type: string; status: string }) => !['validated', 'verified'].includes(doc.status));
-  }, [documents]);
+  const documentIssues = useMemo(() => getAssignmentDocumentIssues((matter as any)?.documents), [matter]);
+  const hasUnvalidatedCoreDocs = documentIssues.length > 0;
 
   const fetchRecommendationsMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.post(`/api/v1/matters/${matterId}/assignment/recommendations`);
+      const res = await api.get(`/api/v1/matters/${matterId}/assignment/recommendations`);
       return Array.isArray(res.data) ? res.data : res.data?.data || [];
     },
     onSuccess: (items) => {
@@ -122,8 +100,11 @@ export default function MatterAssignment() {
             <strong>Assignment diblokir sampai dokumen inti tervalidasi.</strong>
           </div>
           <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            Halaman ini tidak akan menampilkan tombol assign selama dokumen inti masih belum berstatus `validated`.
+            Halaman ini tidak akan menampilkan tombol assign selama dokumen inti belum lengkap dan belum berstatus `validated` atau `verified`.
           </p>
+          <div style={{ marginTop: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+            Perlu dicek: {documentIssues.map((issue) => issue.type.toUpperCase()).join(', ')}.
+          </div>
         </div>
       ) : null}
 

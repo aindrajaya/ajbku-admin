@@ -3,8 +3,10 @@ import { useParams, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import axios from 'axios';
+import { getAssignmentDocumentIssues } from '../lib/assignmentEligibility';
 import { normalizeBodyText, normalizeChatMessage, normalizeChatThread } from '../lib/communication';
 import type { ChatMessage, ChatThread } from '../lib/communication';
+import { buildVerifyDocumentKey, normalizeVerifyDocType, normalizeVerifyPartyRole } from '../lib/verify';
 import { useRealtimeStore } from '../store/realtime';
 import { notifyError, notifyInfo, notifySuccess } from '../store/ui';
 import { queryKeys } from '../lib/queryKeys';
@@ -54,12 +56,23 @@ export default function MatterDetail() {
     }
   });
 
-  // Fetch timeline events
+  // Fetch matter activity from audit events first, with timeline fallback for older backend builds.
   const { data: timeline = [], refetch: refetchTimeline } = useQuery({
-    queryKey: ['matters', id, 'timeline'],
+    queryKey: ['matters', id, 'activity-log'],
     queryFn: async () => {
-      const res = await api.get(`/api/v1/matters/${id}/timeline`);
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
+      try {
+        const auditRes = await api.get('/api/v1/audit-events', { matterId: id });
+        const auditRows = Array.isArray(auditRes.data) ? auditRes.data : auditRes.data?.data || [];
+        const matchingAuditRows = auditRows.filter((evt: any) => evt?.matterId === id || evt?.aggregateId === id);
+        if (matchingAuditRows.length > 0) {
+          return matchingAuditRows;
+        }
+      } catch {
+        // Fall back to matter timeline when audit filtering is not available yet.
+      }
+
+      const timelineRes = await api.get(`/api/v1/matters/${id}/timeline`);
+      return Array.isArray(timelineRes.data) ? timelineRes.data : timelineRes.data?.data || [];
     },
     enabled: !!id
   });
@@ -214,7 +227,7 @@ export default function MatterDetail() {
             <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {safeTimeline.length === 0 ? (
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem' }}>
-                  Belum ada log audit untuk perkara ini
+                  Belum ada aktivitas perkara tercatat.
                 </div>
               ) : (
                 safeTimeline.map((evt: any) => (
@@ -225,6 +238,9 @@ export default function MatterDetail() {
                     </div>
                     <div>
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{evt?.action ? evt.action.replace(/_/g, ' ') : ''}</span>
+                      {evt?.aggregateType ? (
+                        <span className="badge badge-gray" style={{ marginLeft: '0.35rem', fontSize: '0.6rem' }}>{evt.aggregateType}</span>
+                      ) : null}
                       <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', margin: '0.1rem 0' }}>{evt?.details}</p>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                         {evt?.createdAt ? new Date(evt.createdAt).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''} • {evt?.actorName}
@@ -343,26 +359,7 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
   const [uploadingFileName, setUploadingFileName] = useState('');
 
   const safeDocuments = Array.isArray(documents) ? documents : [];
-  const normalizeDocType = (value: unknown) => {
-    const raw = String(value || '').toLowerCase();
-    if (raw === 'sppt_pbb') return 'pbb';
-    if (raw === 'other') return 'lainnya';
-    if (raw.includes('ktp')) return 'ktp';
-    if (raw.includes('kk')) return 'kk';
-    if (raw.includes('npwp')) return 'npwp';
-    if (raw.includes('pbb')) return 'pbb';
-    if (raw.includes('sertifikat')) return 'sertifikat';
-    if (raw.includes('nikah')) return 'surat_nikah';
-    if (raw.includes('cerai')) return 'surat_cerai';
-    if (raw.includes('kelahiran')) return 'akta_kelahiran';
-    if (raw.includes('draft')) return 'akta_draft';
-    if (raw.includes('final')) return 'akta_final';
-    if (raw.includes('waris')) return 'sk_ahli_waris';
-    if (raw.includes('sppht')) return 'sppht';
-    if (raw.includes('bphtb')) return 'bphtb';
-    if (raw.includes('pph')) return 'pph';
-    return raw;
-  };
+  const normalizeDocType = (value: unknown) => normalizeVerifyDocType(value) || String(value || '').toLowerCase();
 
   // Uploader action conforming to 2-step presigned URL uploads
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -442,8 +439,8 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
     }
   };
 
-  const openEmbeddedViewer = (documentType: string, mode: 'preview' | 'verify') => {
-    localStorage.setItem(`ajbku-verify-target-${matterId}`, documentType);
+  const openEmbeddedViewer = (documentKey: string, mode: 'preview' | 'verify') => {
+    localStorage.setItem(`ajbku-verify-target-${matterId}`, documentKey);
     localStorage.setItem(`ajbku-verify-mode-${matterId}`, mode);
     notifyInfo('Dokumen dibuka di viewer verifikasi tersemat.', 'Dokumen');
     void navigate({ to: '/matters/$id/verify', params: { id: matterId } });
@@ -513,8 +510,13 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
           </div>
         ) : (
           safeDocuments.map((d: any) => {
-            const normalizedDocType = normalizeDocType(d.documentType || d.document_type || d.docType);
+            const rawDocType = d.documentType || d.document_type || d.docType;
+            const verifyDocType = normalizeVerifyDocType(rawDocType);
+            const normalizedDocType = verifyDocType || normalizeDocType(rawDocType);
+            const partyRole = normalizeVerifyPartyRole(d.partyRole || d.party_role || rawDocType);
+            const documentKey = verifyDocType ? buildVerifyDocumentKey(verifyDocType, partyRole) : normalizedDocType;
             const docTypeLabel = VALID_DOC_TYPES.find(t => t.value === normalizedDocType)?.label || normalizedDocType?.toUpperCase() || 'DOKUMEN';
+            const partyLabel = partyRole === 'seller' ? 'Penjual' : partyRole === 'buyer' ? 'Pembeli' : '';
             const statusLabels: Record<string, { label: string, className: string }> = {
               missing: { label: 'BELUM UNGGAH', className: 'badge-gray' },
               uploaded: { label: 'MENUNGGU VERIFIKASI', className: 'badge-blue' },
@@ -524,7 +526,7 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
               rejected: { label: 'DITOLAK', className: 'badge-red' }
             };
             const currentStatus = statusLabels[d.verificationStatus || 'missing'] || { label: (d.verificationStatus || '').toUpperCase(), className: 'badge-gray' };
-            const docName = `${docTypeLabel} - Perkara`;
+            const docName = `${docTypeLabel}${partyLabel ? ` ${partyLabel}` : ''} - Perkara`;
             
             return (
               <div 
@@ -544,7 +546,7 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
                   <div>
                     <span style={{ fontSize: '0.9rem', fontWeight: 600, display: 'block' }}>{docName}</span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      Tipe: {docTypeLabel}
+                      Tipe: {docTypeLabel}{partyLabel ? ` (${partyLabel})` : ''}
                     </span>
                   </div>
                 </div>
@@ -556,7 +558,7 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
                   
                   {d.verificationStatus !== 'missing' && (
                     <button 
-                      onClick={() => openEmbeddedViewer(normalizedDocType, 'preview')}
+                      onClick={() => openEmbeddedViewer(documentKey, 'preview')}
                         className="btn btn-secondary" 
                         style={{ padding: '0.35rem 0.6rem' }} 
                         title="Pratinjau Dokumen"
@@ -567,7 +569,7 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
 
                     {d.verificationStatus === 'uploaded' && (
                       <button 
-                        onClick={() => openEmbeddedViewer(normalizedDocType, 'verify')}
+                        onClick={() => openEmbeddedViewer(documentKey, 'verify')}
                         className="btn btn-primary" 
                         style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
                       >
@@ -602,11 +604,18 @@ function AssignTab({ matterId }: { matterId: string }) {
       return res.data;
     }
   });
+  const documentIssues = getAssignmentDocumentIssues((matter as any)?.documents);
+  const hasUnvalidatedCoreDocs = documentIssues.length > 0;
 
   const generateRecommendations = async () => {
+    if (hasUnvalidatedCoreDocs) {
+      notifyError('Assignment diblokir sampai dokumen inti lengkap dan tervalidasi.');
+      return;
+    }
+
     setUiState('loading');
     try {
-      const res = await api.post(`/api/v1/matters/${matterId}/assignment/recommendations`);
+      const res = await api.get(`/api/v1/matters/${matterId}/assignment/recommendations`);
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
       setRecommendations(data);
       setUiState('showing');
@@ -671,6 +680,23 @@ function AssignTab({ matterId }: { matterId: string }) {
           <h5 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.25rem' }}>Notaris Telah Ditugaskan</h5>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             Notaris sedang menyusun minuta draf akta dan menjadwalkan agenda penandatanganan rapat.
+          </p>
+        </div>
+      ) : hasUnvalidatedCoreDocs ? (
+        <div style={{
+          padding: '2.5rem',
+          textAlign: 'center',
+          backgroundColor: 'rgba(217,119,6,0.08)',
+          borderRadius: '10px',
+          border: '1px dashed rgba(217,119,6,0.35)'
+        }}>
+          <AlertTriangle size={32} style={{ color: 'var(--color-gold)', margin: '0 auto 1rem' }} />
+          <h5 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Assignment Diblokir</h5>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+            Dokumen inti harus lengkap dan berstatus `validated` atau `verified` sebelum rekomendasi notaris dapat dibuat.
+          </p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Perlu dicek: {documentIssues.map((issue) => issue.type.toUpperCase()).join(', ')}.
           </p>
         </div>
       ) : uiState === 'idle' ? (
