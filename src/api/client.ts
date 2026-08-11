@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const BASE_URL_KEY = 'ajbku_api_base_url';
-// const DEFAULT_API_BASE_URL = 'https://net-lauren-aindrajaya-5a2990e1.koyeb.app';
-const DEFAULT_API_BASE_URL = 'http://localhost:3000';
+const DEFAULT_API_BASE_URL = 'https://net-lauren-aindrajaya-5a2990e1.koyeb.app';
+// const DEFAULT_API_BASE_URL = 'http://localhost:3000';
 
 export type AppRole =
   | 'PRINCIPAL'

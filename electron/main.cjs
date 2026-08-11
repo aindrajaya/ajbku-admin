@@ -6,8 +6,8 @@ const Store = require('electron-store').default;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const APP_RUNTIME_NAME = isDev ? 'AJBku Admin Dev' : 'AJBku Admin';
 const DEV_SERVER_URL = 'http://localhost:5175';
-// const API_BASE_URL = 'https://net-lauren-aindrajaya-5a2990e1.koyeb.app';
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'https://net-lauren-aindrajaya-5a2990e1.koyeb.app';
+// const API_BASE_URL = 'http://localhost:3000';
 const DEV_SERVER_ORIGINS = `${DEV_SERVER_URL} http://127.0.0.1:5175`;
 
 function logAuthDiagnostic(event, details = {}) {
