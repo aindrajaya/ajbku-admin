@@ -10,6 +10,8 @@ import { buildVerifyDocumentKey, normalizeVerifyDocType, normalizeVerifyPartyRol
 import { useRealtimeStore } from '../store/realtime';
 import { notifyError, notifyInfo, notifySuccess } from '../store/ui';
 import { queryKeys } from '../lib/queryKeys';
+import { getApiErrorMessage } from '../lib/apiError';
+import { extractMatterActivityRows, normalizeMatterActivities } from '../lib/matterActivity';
 import { 
   MATTER_WORKFLOW_STATUS, 
   MATTER_ASSIGNMENT_STATUS, 
@@ -57,22 +59,35 @@ export default function MatterDetail() {
   });
 
   // Fetch matter activity from audit events first, with timeline fallback for older backend builds.
-  const { data: timeline = [], refetch: refetchTimeline } = useQuery({
+  const {
+    data: timeline = [],
+    isLoading: isLoadingTimeline,
+    isError: isTimelineError,
+    refetch: refetchTimeline,
+  } = useQuery({
     queryKey: ['matters', id, 'activity-log'],
     queryFn: async () => {
       try {
-        const auditRes = await api.get('/api/v1/audit-events', { matterId: id });
-        const auditRows = Array.isArray(auditRes.data) ? auditRes.data : auditRes.data?.data || [];
-        const matchingAuditRows = auditRows.filter((evt: any) => evt?.matterId === id || evt?.aggregateId === id);
-        if (matchingAuditRows.length > 0) {
-          return matchingAuditRows;
+        const auditRes = await api.get('/api/v1/audit-events', { matterId: id, page: 1, limit: 50 });
+        const auditRows = extractMatterActivityRows(auditRes.data);
+        if (auditRows?.length) {
+          const auditActivities = normalizeMatterActivities(auditRows, 'audit');
+          if (auditActivities.length) return auditActivities;
         }
       } catch {
         // Fall back to matter timeline when audit filtering is not available yet.
       }
 
       const timelineRes = await api.get(`/api/v1/matters/${id}/timeline`);
-      return Array.isArray(timelineRes.data) ? timelineRes.data : timelineRes.data?.data || [];
+      const timelineRows = extractMatterActivityRows(timelineRes.data);
+      if (!timelineRows) {
+        throw new Error('Format respons timeline perkara tidak valid.');
+      }
+      const timelineActivities = normalizeMatterActivities(timelineRows, 'timeline');
+      if (timelineRows.length > 0 && timelineActivities.length === 0) {
+        throw new Error('Data timeline perkara tidak valid.');
+      }
+      return timelineActivities;
     },
     enabled: !!id
   });
@@ -225,25 +240,43 @@ export default function MatterDetail() {
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>Log Perkara</h3>
             
             <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {safeTimeline.length === 0 ? (
+              {isLoadingTimeline ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem' }}>
+                  Memuat aktivitas perkara...
+                </div>
+              ) : isTimelineError ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem' }}>
+                  <div style={{ marginBottom: '0.75rem' }}>Log perkara gagal dimuat.</div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
+                    onClick={() => refetchTimeline()}
+                  >
+                    Coba Lagi
+                  </button>
+                </div>
+              ) : safeTimeline.length === 0 ? (
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem' }}>
                   Belum ada aktivitas perkara tercatat.
                 </div>
               ) : (
-                safeTimeline.map((evt: any) => (
+                safeTimeline.map((evt) => (
                   <div key={evt.id} style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <Activity size={14} style={{ color: 'var(--color-emerald)', flexShrink: 0 }} />
                       <div style={{ width: '1px', flex: 1, backgroundColor: 'var(--border-glass)', margin: '0.25rem 0' }} />
                     </div>
                     <div>
-                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{evt?.action ? evt.action.replace(/_/g, ' ') : ''}</span>
-                      {evt?.aggregateType ? (
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{evt.title}</span>
+                      {evt.aggregateType ? (
                         <span className="badge badge-gray" style={{ marginLeft: '0.35rem', fontSize: '0.6rem' }}>{evt.aggregateType}</span>
                       ) : null}
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', margin: '0.1rem 0' }}>{evt?.details}</p>
+                      {evt.description ? (
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', margin: '0.1rem 0' }}>{evt.description}</p>
+                      ) : null}
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        {evt?.createdAt ? new Date(evt.createdAt).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''} • {evt?.actorName}
+                        {evt.createdAt ? new Date(evt.createdAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : 'Waktu tidak tersedia'} • {evt.actorName}
                       </span>
                     </div>
                   </div>
@@ -620,7 +653,7 @@ function AssignTab({ matterId }: { matterId: string }) {
       setRecommendations(data);
       setUiState('showing');
     } catch (e) {
-      notifyError('Gagal menghasilkan rekomendasi notaris.');
+      notifyError(getApiErrorMessage(e, 'Gagal menghasilkan rekomendasi notaris.'));
       setUiState('idle');
     }
   };
@@ -637,7 +670,7 @@ function AssignTab({ matterId }: { matterId: string }) {
       setUiState('done');
       notifySuccess('Notaris berhasil ditugaskan untuk perkara ini.');
     } catch (e) {
-      notifyError('Gagal menetapkan penugasan notaris.');
+      notifyError(getApiErrorMessage(e, 'Gagal menetapkan penugasan notaris.'));
       setUiState('showing');
     }
   };
@@ -656,7 +689,7 @@ function AssignTab({ matterId }: { matterId: string }) {
       setRejectReason('');
       notifySuccess('Rekomendasi berhasil ditolak.');
     } catch (e) {
-      notifyError('Gagal menolak rekomendasi notaris.');
+      notifyError(getApiErrorMessage(e, 'Gagal menolak rekomendasi notaris.'));
     }
   };
 
