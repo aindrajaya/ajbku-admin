@@ -13,6 +13,8 @@ import {
   Bell,
   LogOut,
   ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen,
   Building,
   Sun,
   Moon,
@@ -65,6 +67,7 @@ export default function Layout() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('ajbku-theme') as 'light' | 'dark') || 'light');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => localStorage.getItem('ajbku-sidebar-collapsed') === 'true');
   const [updaterState, setUpdaterState] = useState<UpdaterState | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const tenantSettings = useSettingsStore((state) => state.getTenantSettings(user?.tenantId || 'tenant-id'));
@@ -76,6 +79,10 @@ export default function Layout() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('ajbku-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('ajbku-sidebar-collapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   useEffect(() => {
     if (!hasElectronApi()) {
@@ -202,20 +209,49 @@ export default function Layout() {
           message="Session sedang ditutup dengan aman dan data akses lokal sedang dibersihkan."
         />
       ) : null}
-      <aside className="glass-panel" style={{ width: '260px', borderRadius: 0, borderTop: 'none', borderBottom: 'none', borderLeft: 'none', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '1.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid var(--border-glass)' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: shellLogoUrl ? `center / cover no-repeat url(${shellLogoUrl})` : 'linear-gradient(135deg, var(--color-emerald), var(--color-gold))', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700 }}>
-            {!shellLogoUrl ? 'A' : ''}
+      <aside className="glass-panel" style={{ width: isSidebarCollapsed ? '76px' : '260px', borderRadius: 0, borderTop: 'none', borderBottom: 'none', borderLeft: 'none', display: 'flex', flexDirection: 'column', transition: 'width 180ms ease', overflow: 'hidden', flexShrink: 0 }}>
+        <div style={{ padding: isSidebarCollapsed ? '1.25rem 0.75rem' : '1.75rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: isSidebarCollapsed ? 'center' : 'space-between', gap: '0.75rem', borderBottom: '1px solid var(--border-glass)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: shellLogoUrl ? `center / cover no-repeat url(${shellLogoUrl})` : 'linear-gradient(135deg, var(--color-emerald), var(--color-gold))', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700, flexShrink: 0 }}>
+              {!shellLogoUrl ? 'A' : ''}
+            </div>
+            {!isSidebarCollapsed ? (
+              <div style={{ minWidth: 0 }}>
+                <h1 style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>AJB<span style={{ color: 'var(--color-emerald)' }}>ku</span>.id</h1>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Portal Operasional</span>
+              </div>
+            ) : null}
           </div>
-          <div>
-            <h1 style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-primary)' }}>AJB<span style={{ color: 'var(--color-emerald)' }}>ku</span>.id</h1>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Portal Operasional</span>
-          </div>
+          {!isSidebarCollapsed ? (
+            <button
+              type="button"
+              aria-label="Sembunyikan sidebar"
+              title="Sembunyikan sidebar"
+              onClick={() => setIsSidebarCollapsed(true)}
+              className="glass-panel-interactive"
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.45rem', borderRadius: '8px', display: 'grid', placeItems: 'center', flexShrink: 0 }}
+            >
+              <PanelLeftClose size={18} />
+            </button>
+          ) : null}
         </div>
 
-        <nav style={{ flex: 1, padding: '1.5rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', overflowY: 'auto' }}>
+        {isSidebarCollapsed ? (
+          <button
+            type="button"
+            aria-label="Tampilkan sidebar"
+            title="Tampilkan sidebar"
+            onClick={() => setIsSidebarCollapsed(false)}
+            className="glass-panel-interactive"
+            style={{ margin: '0.75rem auto 0', background: 'none', border: '1px solid var(--border-glass)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.45rem', borderRadius: '8px', display: 'grid', placeItems: 'center' }}
+          >
+            <PanelLeftOpen size={18} />
+          </button>
+        ) : null}
+
+        <nav style={{ flex: 1, padding: isSidebarCollapsed ? '0.75rem 0.5rem' : '1.5rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', overflowY: 'auto' }}>
           {visibleNav.map((item) => (
-            <SidebarLink key={item.to} to={item.to} icon={item.icon} label={item.label} active={pathname === item.to || (item.to !== '/' && pathname.startsWith(item.to))} badgeCount={badgeFor(item.key)} />
+            <SidebarLink key={item.to} to={item.to} icon={item.icon} label={item.label} active={pathname === item.to || (item.to !== '/' && pathname.startsWith(item.to))} badgeCount={badgeFor(item.key)} collapsed={isSidebarCollapsed} />
           ))}
         </nav>
 
@@ -235,8 +271,10 @@ export default function Layout() {
             </div>
           </div>
         )}
-        <div style={{ padding: '0.55rem 1rem', borderTop: '1px solid var(--border-glass)', fontSize: '0.7rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)' }}>
-          Sinkronisasi: {fallbackEnabled ? `polling ${Math.round(fallbackIntervalMs / 1000)} detik` : realtimeStatus}
+        <div style={{ padding: isSidebarCollapsed ? '0.55rem 0.35rem' : '0.55rem 1rem', borderTop: '1px solid var(--border-glass)', fontSize: '0.7rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', textAlign: isSidebarCollapsed ? 'center' : 'left' }}>
+          {isSidebarCollapsed
+            ? (fallbackEnabled ? `${Math.round(fallbackIntervalMs / 1000)}s` : realtimeStatus)
+            : `Sinkronisasi: ${fallbackEnabled ? `polling ${Math.round(fallbackIntervalMs / 1000)} detik` : realtimeStatus}`}
         </div>
       </aside>
 
@@ -335,20 +373,22 @@ function SidebarLink({
   label,
   active,
   badgeCount,
+  collapsed,
 }: {
   to: string;
   icon: React.ReactNode;
   label: string;
   active: boolean;
   badgeCount?: number;
+  collapsed?: boolean;
 }) {
   return (
-    <Link to={to} className={active ? '' : 'sidebar-link-hover'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.8rem 1.2rem', borderRadius: '8px', color: active ? 'var(--sidebar-active-text)' : 'var(--text-secondary)', background: active ? 'var(--sidebar-active-bg)' : 'transparent', border: active ? '1px solid var(--sidebar-active-border)' : '1px solid transparent', textDecoration: 'none', fontWeight: active ? 600 : 500, fontSize: '0.95rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+    <Link to={to} title={collapsed ? label : undefined} className={active ? '' : 'sidebar-link-hover'} style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: collapsed ? '0.8rem' : '0.8rem 1.2rem', borderRadius: '8px', color: active ? 'var(--sidebar-active-text)' : 'var(--text-secondary)', background: active ? 'var(--sidebar-active-bg)' : 'transparent', border: active ? '1px solid var(--sidebar-active-border)' : '1px solid transparent', textDecoration: 'none', fontWeight: active ? 600 : 500, fontSize: '0.95rem', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: collapsed ? 0 : '0.75rem', minWidth: 0 }}>
         <span style={{ color: active ? 'var(--color-emerald)' : 'var(--text-muted)' }}>{icon}</span>
-        <span>{label}</span>
+        {!collapsed ? <span>{label}</span> : null}
       </div>
-      {badgeCount ? <span style={{ backgroundColor: 'var(--color-emerald)', color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '10px' }}>{badgeCount}</span> : null}
+      {badgeCount ? <span style={{ position: collapsed ? 'absolute' : 'static', top: collapsed ? '4px' : undefined, right: collapsed ? '4px' : undefined, backgroundColor: 'var(--color-emerald)', color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: collapsed ? '0 0.32rem' : '0.1rem 0.45rem', borderRadius: '10px', minWidth: collapsed ? '16px' : undefined, height: collapsed ? '16px' : undefined, display: 'grid', placeItems: 'center' }}>{badgeCount}</span> : null}
       <style>{`.sidebar-link-hover:hover { background: var(--sidebar-hover-bg); color: var(--text-primary); border-color: var(--sidebar-hover-border); }`}</style>
     </Link>
   );
