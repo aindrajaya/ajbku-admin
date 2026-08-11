@@ -12,7 +12,16 @@ export const routeAccess = {
   reports: ['PRINCIPAL', 'SUPER_ADMIN', 'FINANCE_ADMIN'],
   audit: ['PRINCIPAL', 'SUPER_ADMIN'],
   invitations: ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE'],
-  settings: ['PRINCIPAL', 'SUPER_ADMIN'],
+  settings: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE', 'ADMIN_INTAKE', 'FINANCE_ADMIN'],
+} satisfies Record<string, AppRole[]>;
+
+export const documentVerificationRoles = ['ADMIN_INTAKE', 'PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_OFFICE'] satisfies AppRole[];
+
+export const settingsAccess = {
+  profile: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE'],
+  staff: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE'],
+  notaries: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE', 'ADMIN_INTAKE'],
+  rates: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE', 'FINANCE_ADMIN'],
 } satisfies Record<string, AppRole[]>;
 
 export function hasAnyRole(roles: readonly AppRole[] | null | undefined, allowed: readonly AppRole[]) {
@@ -22,6 +31,14 @@ export function hasAnyRole(roles: readonly AppRole[] | null | undefined, allowed
 
 export function canAccess(roles: readonly AppRole[] | null | undefined, key: keyof typeof routeAccess) {
   return hasAnyRole(roles, routeAccess[key] as readonly AppRole[]);
+}
+
+export function canVerifyDocuments(roles: readonly AppRole[] | null | undefined) {
+  return hasAnyRole(roles, documentVerificationRoles);
+}
+
+export function canAccessSettingsTab(roles: readonly AppRole[] | null | undefined, tab: keyof typeof settingsAccess) {
+  return hasAnyRole(roles, settingsAccess[tab] as readonly AppRole[]);
 }
 
 export function getPrimaryAdminRole(roles: readonly AppRole[] | null | undefined): AppRole | null {
