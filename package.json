@@ -1,7 +1,7 @@
 {
   "name": "ajbku-admin",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "AJBku Admin Desktop Dashboard",
   "author": "AJBku",
   "main": "electron/main.cjs",
