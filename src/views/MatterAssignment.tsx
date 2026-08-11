@@ -4,14 +4,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, MapPin, UserCheck } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
+import { NotaryCandidateCard } from '../components/NotaryCandidateCard';
 import { getAssignmentDocumentIssues } from '../lib/assignmentEligibility';
+import { getApiErrorMessage } from '../lib/apiError';
+import {
+  assignMatterToNotary,
+  listNotaryPartnerRecommendations,
+  type NotaryPartnerRecommendation,
+} from '../lib/notaryPartners';
 import { notifyError, notifySuccess } from '../store/ui';
 
 export default function MatterAssignment() {
   const { id: matterId } = useParams({ strict: false }) as { id: string };
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<NotaryPartnerRecommendation[]>([]);
   const [selectedNotaryId, setSelectedNotaryId] = useState<string | null>(null);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -26,30 +33,27 @@ export default function MatterAssignment() {
   const hasUnvalidatedCoreDocs = documentIssues.length > 0;
 
   const fetchRecommendationsMutation = useMutation({
-    mutationFn: async () => {
-      const res = await api.get(`/api/v1/matters/${matterId}/assignment/recommendations`);
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
-    },
+    mutationFn: () => listNotaryPartnerRecommendations(matterId),
     onSuccess: (items) => {
       setRecommendations(items);
       if (!items.length) {
         notifyError('Tidak ada notaris yang cocok untuk wilayah perkara ini.');
       }
     },
-    onError: () => notifyError('Gagal menghasilkan rekomendasi notaris.'),
+    onError: (error) => notifyError(getApiErrorMessage(error, 'Gagal menghasilkan rekomendasi notaris.')),
   });
 
   const assignMutation = useMutation({
     mutationFn: async () => {
       if (!selectedNotaryId) throw new Error('No notary selected.');
-      return api.post(`/api/v1/matters/${matterId}/assignment/decide`, { notaryId: selectedNotaryId });
+      return assignMatterToNotary(matterId, selectedNotaryId);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['matters', matterId] });
       await queryClient.invalidateQueries({ queryKey: ['matters'] });
       notifySuccess('Notaris berhasil ditugaskan untuk perkara ini.');
     },
-    onError: () => notifyError('Gagal menetapkan penugasan notaris.'),
+    onError: (error) => notifyError(getApiErrorMessage(error, 'Gagal menetapkan penugasan notaris.')),
   });
 
   const rejectMutation = useMutation({
@@ -64,7 +68,7 @@ export default function MatterAssignment() {
       await queryClient.invalidateQueries({ queryKey: ['matters', matterId] });
       notifySuccess('Rekomendasi berhasil ditolak.');
     },
-    onError: (error: any) => notifyError(error?.message || 'Gagal menolak rekomendasi notaris.'),
+    onError: (error) => notifyError(getApiErrorMessage(error, 'Gagal menolak rekomendasi notaris.')),
   });
 
   if (matterQuery.isLoading) {
@@ -137,38 +141,15 @@ export default function MatterAssignment() {
 
       {recommendations.length > 0 ? (
         <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {recommendations.map((item: any) => {
-            const candidateId = item.notaryProfileId || item.notary_profile_id || item.id;
-            const name = item.fullName || item.notaryProfile?.user?.fullName || 'Notary Candidate';
-            const distance = item.distanceKm || 0;
-            const activeMatters = item.activeMattersCount || 0;
+          {recommendations.map((item) => {
+            const candidateId = item.notaryProfileId;
             return (
-              <button
+              <NotaryCandidateCard
                 key={candidateId}
-                type="button"
-                onClick={() => setSelectedNotaryId(candidateId)}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  border: selectedNotaryId === candidateId ? '1px solid var(--color-emerald)' : '1px solid var(--border-glass)',
-                  background: selectedNotaryId === candidateId ? 'rgba(16,185,129,0.08)' : 'rgba(0,0,0,0.15)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                  <strong>{name}</strong>
-                  <span style={{ color: 'var(--color-emerald)', fontSize: '0.8rem' }}>SLA {item.slaPerformanceScore || item.performance_score || 80}%</span>
-                </div>
-                <div style={{ marginTop: '0.35rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                  {item.scoreReason || 'Sesuai cakupan wilayah dan beban kerja.'}
-                </div>
-                <div style={{ marginTop: '0.35rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                  Jarak: {distance} km • Kasus aktif: {activeMatters}
-                </div>
-              </button>
+                candidate={item}
+                selected={selectedNotaryId === candidateId}
+                onSelect={setSelectedNotaryId}
+              />
             );
           })}
 
