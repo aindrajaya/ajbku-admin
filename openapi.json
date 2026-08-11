@@ -30,6 +30,14 @@
             }
           },
           {
+            "name": "matterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "limit",
             "required": false,
             "in": "query",
@@ -106,6 +114,233 @@
           }
         },
         "summary": "Login pengguna dengan email dan password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Client aktif menerima session dan permissions workspace client. Notary baru menerima status pending_verification tanpa permissions workspace notary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AuthSessionResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PendingVerificationResponseDto"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "summary": "Registrasi client/notary dengan email dan password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/google/start": {
+      "get": {
+        "operationId": "AuthController_googleStart",
+        "parameters": [
+          {
+            "name": "role",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "client",
+                "notary"
+              ]
+            }
+          },
+          {
+            "name": "redirect",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "/client/services/ajb-oke",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tenantCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "tenant-demo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect ke Google OAuth URL dengan signed state"
+          }
+        },
+        "summary": "Mulai Google OAuth untuk client/notary",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/google/callback": {
+      "post": {
+        "operationId": "AuthController_googleCallback",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleCallbackDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Client aktif menerima session. Notary pending menerima pending_verification tanpa permissions workspace notary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AuthSessionResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PendingVerificationResponseDto"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tukar Google OAuth code dan selesaikan login/onboarding",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/register-client": {
+      "post": {
+        "operationId": "AuthController_registerClient",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterClientDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Membuat user aplikasi, role CLIENT, client profile aktif, dan mengembalikan profileId. Jika Supabase email verification aktif, token dapat null dan requiresEmailVerification bernilai true.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthLoginResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Registrasi mandiri client pada tenant AJBKu",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/register-notary": {
+      "post": {
+        "operationId": "AuthController_registerNotary",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterNotaryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Membuat user aplikasi, role NOTARY, notary profile pending_approval, dan mengembalikan pending_verification tanpa session notary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingVerificationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Registrasi mandiri notaris mitra AJBKu",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/google": {
+      "post": {
+        "operationId": "AuthController_google",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleAuthDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User existing langsung login. User baru wajib mengirim workspace; workspace NOTARY tetap membuat profil pending_approval tanpa session notary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AuthLoginResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PendingVerificationResponseDto"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "summary": "Login atau onboarding via Supabase Google OAuth ID token",
         "tags": [
           "auth"
         ]
@@ -1300,6 +1535,16 @@
           "400": {
             "description": "FORMAT_NOT_SUPPORTED, FILE_TOO_LARGE, atau INVALID_DOCUMENT_TYPE"
           },
+          "403": {
+            "description": "DOCUMENT_UPLOAD_CLIENT_PROFILE_NOT_FOUND, DOCUMENT_UPLOAD_MATTER_NOT_FOUND_IN_TENANT, atau DOCUMENT_UPLOAD_CLIENT_PROFILE_MISMATCH untuk penolakan ownership/tenant scope pada CLIENT upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentUploadAuthorizationErrorResponseDto"
+                }
+              }
+            }
+          },
           "409": {
             "description": "DOCUMENT_ALREADY_UPLOADED: document for this matter/docType is already uploaded, under review, or verified."
           }
@@ -1357,6 +1602,16 @@
         "responses": {
           "201": {
             "description": "Upload completed and document version created."
+          },
+          "403": {
+            "description": "DOCUMENT_UPLOAD_CLIENT_PROFILE_NOT_FOUND, DOCUMENT_UPLOAD_MATTER_NOT_FOUND_IN_TENANT, atau DOCUMENT_UPLOAD_CLIENT_PROFILE_MISMATCH untuk penolakan ownership/tenant scope pada CLIENT upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentUploadAuthorizationErrorResponseDto"
+                }
+              }
+            }
           },
           "422": {
             "description": "STORAGE_OBJECT_NOT_FOUND: object with the provided storageKey does not exist in S3-compatible storage."
@@ -1418,7 +1673,10 @@
           "documents"
         ],
         "x-roles": [
-          "ADMIN_INTAKE"
+          "ADMIN_INTAKE",
+          "PRINCIPAL",
+          "SUPER_ADMIN",
+          "ADMIN_OFFICE"
         ]
       }
     },
@@ -1524,7 +1782,8 @@
         "x-roles": [
           "ADMIN_INTAKE",
           "ADMIN_OFFICE",
-          "PRINCIPAL"
+          "PRINCIPAL",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -1568,7 +1827,8 @@
         "x-roles": [
           "ADMIN_INTAKE",
           "ADMIN_OFFICE",
-          "PRINCIPAL"
+          "PRINCIPAL",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -1644,7 +1904,8 @@
         "x-roles": [
           "ADMIN_INTAKE",
           "ADMIN_OFFICE",
-          "PRINCIPAL"
+          "PRINCIPAL",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -1742,6 +2003,98 @@
           "SUPER_ADMIN",
           "NOTARY",
           "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/admin/notary-payouts": {
+      "get": {
+        "operationId": "NotaryPayoutController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "pending",
+                "paid",
+                "cancelled"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "matterId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "notaryProfileId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internal payout list. Separate from client payments."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List internal AJBKu-to-notary payouts",
+        "tags": [
+          "admin",
+          "payments"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      },
+      "post": {
+        "operationId": "NotaryPayoutController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotaryPayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payout record created."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create internal notary payout record",
+        "tags": [
+          "admin",
+          "payments"
+        ],
+        "x-roles": [
+          "FINANCE_ADMIN",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -3001,6 +3354,299 @@
         ]
       }
     },
+    "/api/v1/clients/me/location": {
+      "patch": {
+        "description": "GPS bersifat opsional dan hanya disimpan jika dikirim eksplisit oleh frontend setelah izin user.",
+        "operationId": "ProfileLocationController_updateClientLocation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateClientLocationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientLocationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update lokasi client login",
+        "tags": [
+          "ProfileLocation",
+          "clients"
+        ],
+        "x-roles": [
+          "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/notaries/me/location": {
+      "patch": {
+        "operationId": "ProfileLocationController_updateNotaryLocation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotaryLocationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotaryLocationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update lokasi kantor notaris login",
+        "tags": [
+          "ProfileLocation",
+          "notaries"
+        ],
+        "x-roles": [
+          "NOTARY"
+        ]
+      }
+    },
+    "/api/v1/admin/matters": {
+      "get": {
+        "operationId": "AdminController_listMatters",
+        "parameters": [
+          {
+            "name": "workflowStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignmentStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedNotaryProfileId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Internal admin matter list",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "ADMIN_INTAKE"
+        ]
+      }
+    },
+    "/api/v1/admin/notary-partners": {
+      "get": {
+        "description": "Internal-only. Does not expose raw office coordinates.",
+        "operationId": "AdminController_listNotaryPartners",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "city",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jurisdictionCity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Internal admin notary partner list",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "ADMIN_INTAKE"
+        ]
+      }
+    },
+    "/api/v1/admin/notary-partners/{notaryProfileId}/status": {
+      "patch": {
+        "operationId": "AdminController_updateNotaryPartnerStatus",
+        "parameters": [
+          {
+            "name": "notaryProfileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotaryPartnerStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update internal notary partner approval status",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "ADMIN_INTAKE"
+        ]
+      }
+    },
+    "/api/v1/admin/matters/{matterId}/assign": {
+      "post": {
+        "description": "Delegates to the canonical AssignmentService write path.",
+        "operationId": "AdminController_assignMatter",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignMatterToNotaryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Assign notary partner to matter",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE",
+          "ADMIN_INTAKE"
+        ]
+      }
+    },
     "/api/v1": {
       "get": {
         "operationId": "AppController_getHello",
@@ -3030,6 +3676,18 @@
     {
       "name": "tenants",
       "description": "Manajemen tenant dan kantor"
+    },
+    {
+      "name": "clients",
+      "description": "Profil dan lokasi client"
+    },
+    {
+      "name": "notaries",
+      "description": "Profil dan lokasi notaris"
+    },
+    {
+      "name": "admin",
+      "description": "Operasional internal AJBKu"
     },
     {
       "name": "matters",
@@ -3106,6 +3764,151 @@
       }
     },
     "schemas": {
+      "FrontendSessionDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "expiresAt"
+        ]
+      },
+      "FrontendAuthUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "client",
+              "notary",
+              "admin"
+            ]
+          },
+          "profileId": {
+            "type": "string"
+          },
+          "officeId": {
+            "type": "object",
+            "nullable": true
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role",
+          "profileId",
+          "officeId",
+          "tenantId"
+        ]
+      },
+      "FrontendPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "client",
+              "notary",
+              "admin"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "abilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "workspace",
+          "roles",
+          "abilities"
+        ]
+      },
+      "AuthSessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FrontendSessionDto"
+              }
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/FrontendAuthUserDto"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/FrontendPermissionsDto"
+          }
+        },
+        "required": [
+          "session",
+          "user",
+          "permissions"
+        ]
+      },
+      "PendingVerificationResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_verification"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "notary"
+            ]
+          },
+          "email": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "example": "Pendaftaran notaris sedang menunggu verifikasi."
+          }
+        },
+        "required": [
+          "status",
+          "role",
+          "email",
+          "message"
+        ]
+      },
       "LoginDto": {
         "type": "object",
         "properties": {
@@ -3120,13 +3923,12 @@
           "tenantCode": {
             "type": "string",
             "example": "tenant-abc",
-            "description": "Kode tenant kantor"
+            "description": "Kode tenant kantor. Optional untuk CLIENT/NOTARY v3; jika kosong backend memakai tenant AJBKu."
           }
         },
         "required": [
           "email",
-          "password",
-          "tenantCode"
+          "password"
         ]
       },
       "AuthUserDto": {
@@ -3182,16 +3984,21 @@
         "type": "object",
         "properties": {
           "accessToken": {
-            "type": "string"
+            "type": "object",
+            "nullable": true
           },
           "refreshToken": {
-            "type": "string"
+            "type": "object",
+            "nullable": true
           },
           "expiresIn": {
             "type": "number"
           },
           "tokenType": {
             "type": "string"
+          },
+          "requiresEmailVerification": {
+            "type": "boolean"
           },
           "user": {
             "$ref": "#/components/schemas/AuthUserDto"
@@ -3201,6 +4008,232 @@
           "accessToken",
           "refreshToken",
           "user"
+        ]
+      },
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "client",
+              "notary"
+            ]
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "email_password"
+            ]
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Client Name"
+          },
+          "email": {
+            "type": "string",
+            "example": "client@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "password123",
+            "minLength": 8
+          },
+          "tenantCode": {
+            "type": "string",
+            "example": "tenant-demo"
+          },
+          "phone": {
+            "type": "string",
+            "example": "08123456789"
+          },
+          "officeName": {
+            "type": "string",
+            "example": "Kantor Notaris ABC"
+          },
+          "licenseNumber": {
+            "type": "string",
+            "example": "SK-123456"
+          },
+          "city": {
+            "type": "string",
+            "example": "Jakarta"
+          }
+        },
+        "required": [
+          "role",
+          "provider",
+          "fullName",
+          "email",
+          "password"
+        ]
+      },
+      "GoogleCallbackDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "redirect": {
+            "type": "string",
+            "example": "/client/services/ajb-oke"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ]
+      },
+      "RegisterClientDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "client@mail.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "P@ssw0rd123"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Budi Santoso"
+          },
+          "phone": {
+            "type": "string",
+            "example": "08123456789"
+          },
+          "city": {
+            "type": "string",
+            "example": "Jakarta Selatan"
+          },
+          "province": {
+            "type": "string",
+            "example": "DKI Jakarta"
+          },
+          "postalCode": {
+            "type": "string",
+            "example": "12190"
+          },
+          "address": {
+            "type": "string",
+            "example": "Jl. Melati No. 10"
+          },
+          "domicile": {
+            "type": "string",
+            "example": "Jakarta Selatan"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "fullName"
+        ]
+      },
+      "RegisterNotaryDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "notaris@mail.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "P@ssw0rd123"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Raka Pratama, SH., M.Kn."
+          },
+          "phone": {
+            "type": "string",
+            "example": "08123456789"
+          },
+          "licenseNumber": {
+            "type": "string",
+            "example": "MN.123/2026"
+          },
+          "licenseDate": {
+            "type": "string",
+            "example": "2024-01-15"
+          },
+          "jurisdictionCity": {
+            "type": "string",
+            "example": "Jakarta Selatan"
+          },
+          "officeAddress": {
+            "type": "string",
+            "example": "Jl. Notaris No. 1"
+          },
+          "officeCity": {
+            "type": "string",
+            "example": "Jakarta Selatan"
+          },
+          "officeProvince": {
+            "type": "string",
+            "example": "DKI Jakarta"
+          },
+          "officePostalCode": {
+            "type": "string",
+            "example": "12190"
+          },
+          "documentsJson": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "fullName",
+          "phone",
+          "licenseNumber",
+          "licenseDate",
+          "jurisdictionCity"
+        ]
+      },
+      "GoogleAuthDto": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "description": "Google ID token obtained by the frontend."
+          },
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "CLIENT",
+              "NOTARY"
+            ]
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Budi Santoso"
+          },
+          "phone": {
+            "type": "string",
+            "example": "08123456789"
+          },
+          "licenseNumber": {
+            "type": "string",
+            "example": "MN.123/2026"
+          },
+          "licenseDate": {
+            "type": "string",
+            "example": "2024-01-15"
+          },
+          "jurisdictionCity": {
+            "type": "string",
+            "example": "Jakarta Selatan"
+          },
+          "documentsJson": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "idToken"
         ]
       },
       "RefreshTokenDto": {
@@ -3530,9 +4563,11 @@
           },
           "status": {
             "type": "string",
-            "example": "active",
+            "example": "approved",
             "enum": [
-              "active",
+              "pending_approval",
+              "approved",
+              "rejected",
               "inactive",
               "suspended"
             ]
@@ -3706,7 +4741,8 @@
         "type": "object",
         "properties": {
           "officeId": {
-            "type": "string"
+            "type": "string",
+            "description": "Required for admin-created matters. Ignored for CLIENT role - server resolves the tenant default office."
           },
           "clientProfileId": {
             "type": "string",
@@ -3736,7 +4772,6 @@
           }
         },
         "required": [
-          "officeId",
           "serviceCategoryId",
           "title"
         ]
@@ -3829,41 +4864,37 @@
           "id": {
             "type": "string"
           },
-          "storage_key": {
+          "originalFilename": {
             "type": "string"
           },
-          "original_filename": {
+          "mimeType": {
             "type": "string"
           },
-          "mime_type": {
-            "type": "string"
-          },
-          "file_size_bytes": {
+          "fileSizeBytes": {
             "type": "number"
           },
-          "version_number": {
+          "versionNumber": {
             "type": "number"
           },
-          "ocr_status": {
+          "ocrStatus": {
             "type": "string"
           },
-          "watermark_status": {
+          "watermarkStatus": {
             "type": "string"
           },
-          "created_at": {
+          "createdAt": {
             "type": "string"
           }
         },
         "required": [
           "id",
-          "storage_key",
-          "original_filename",
-          "mime_type",
-          "file_size_bytes",
-          "version_number",
-          "ocr_status",
-          "watermark_status",
-          "created_at"
+          "originalFilename",
+          "mimeType",
+          "fileSizeBytes",
+          "versionNumber",
+          "ocrStatus",
+          "watermarkStatus",
+          "createdAt"
         ]
       },
       "MatterDocumentDto": {
@@ -3872,20 +4903,23 @@
           "id": {
             "type": "string"
           },
-          "tenant_id": {
+          "tenantId": {
             "type": "string"
           },
-          "matter_id": {
+          "matterId": {
             "type": "string"
           },
-          "owner_client_profile_id": {
+          "ownerClientProfileId": {
             "type": "object",
             "nullable": true
           },
-          "document_type": {
+          "documentSlotKey": {
             "type": "string"
           },
-          "party_role": {
+          "documentType": {
+            "type": "string"
+          },
+          "partyRole": {
             "type": "string",
             "nullable": true,
             "enum": [
@@ -3898,24 +4932,24 @@
               "consultant"
             ]
           },
-          "latest_version_id": {
+          "latestVersionId": {
             "type": "object",
             "nullable": true
           },
-          "verification_status": {
+          "verificationStatus": {
             "type": "string"
           },
-          "visibility_scope": {
+          "visibilityScope": {
             "type": "string"
           },
-          "rejection_reason": {
+          "rejectionReason": {
             "type": "object",
             "nullable": true
           },
-          "created_at": {
+          "createdAt": {
             "type": "string"
           },
-          "updated_at": {
+          "updatedAt": {
             "type": "string"
           },
           "latestVersion": {
@@ -3929,13 +4963,14 @@
         },
         "required": [
           "id",
-          "tenant_id",
-          "matter_id",
-          "document_type",
-          "verification_status",
-          "visibility_scope",
-          "created_at",
-          "updated_at"
+          "tenantId",
+          "matterId",
+          "documentSlotKey",
+          "documentType",
+          "verificationStatus",
+          "visibilityScope",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "MatterDetailResponseDto": {
@@ -3944,62 +4979,66 @@
           "id": {
             "type": "string"
           },
-          "tenant_id": {
+          "tenantId": {
             "type": "string"
           },
-          "office_id": {
+          "officeId": {
             "type": "string"
           },
-          "client_profile_id": {
+          "clientProfileId": {
             "type": "string"
           },
-          "service_category_id": {
+          "serviceCategoryId": {
             "type": "string"
           },
-          "matter_number": {
+          "matterNumber": {
             "type": "object",
             "nullable": true
           },
           "title": {
             "type": "string"
           },
-          "land_city_code": {
+          "landCityCode": {
             "type": "object",
             "nullable": true
           },
-          "land_province_code": {
+          "landProvinceCode": {
             "type": "object",
             "nullable": true
           },
-          "land_certificate_number": {
+          "landLocation": {
             "type": "object",
             "nullable": true
           },
-          "transaction_value": {
+          "landCertificateNumber": {
+            "type": "object",
+            "nullable": true
+          },
+          "transactionValue": {
             "type": "object"
           },
-          "workflow_status": {
+          "workflowStatus": {
             "type": "string"
           },
-          "assignment_status": {
+          "assignmentStatus": {
             "type": "string"
           },
-          "payment_status": {
+          "paymentStatus": {
             "type": "string"
           },
-          "bpn_validation_status": {
+          "bpnValidationStatus": {
             "type": "string"
           },
-          "signing_status": {
+          "signingStatus": {
             "type": "string"
           },
-          "created_by": {
+          "createdBy": {
             "type": "string"
           },
-          "created_at": {
+          "createdAt": {
             "type": "string"
           },
-          "updated_at": {
+          "updatedAt": {
             "type": "string"
           },
           "serviceCategory": {
@@ -4033,19 +5072,19 @@
         },
         "required": [
           "id",
-          "tenant_id",
-          "office_id",
-          "client_profile_id",
-          "service_category_id",
+          "tenantId",
+          "officeId",
+          "clientProfileId",
+          "serviceCategoryId",
           "title",
-          "workflow_status",
-          "assignment_status",
-          "payment_status",
-          "bpn_validation_status",
-          "signing_status",
-          "created_by",
-          "created_at",
-          "updated_at",
+          "workflowStatus",
+          "assignmentStatus",
+          "paymentStatus",
+          "bpnValidationStatus",
+          "signingStatus",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
           "parties",
           "timelines",
           "documents",
@@ -4248,6 +5287,82 @@
         "required": [
           "documentId",
           "upload"
+        ]
+      },
+      "DocumentUploadAuthorizationErrorDetailsDto": {
+        "type": "object",
+        "properties": {
+          "matterId": {
+            "type": "object",
+            "example": "5649af53-3f48-49d5-8c70-1897fef0fef9",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "presign",
+              "complete"
+            ],
+            "example": "presign",
+            "nullable": true
+          },
+          "ownershipCheck": {
+            "type": "string",
+            "enum": [
+              "client_profile_lookup",
+              "matter_lookup",
+              "matter_owner_match"
+            ],
+            "example": "matter_owner_match"
+          }
+        },
+        "required": [
+          "matterId",
+          "source",
+          "ownershipCheck"
+        ]
+      },
+      "DocumentUploadAuthorizationErrorDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "DOCUMENT_UPLOAD_CLIENT_PROFILE_NOT_FOUND",
+              "DOCUMENT_UPLOAD_MATTER_NOT_FOUND_IN_TENANT",
+              "DOCUMENT_UPLOAD_CLIENT_PROFILE_MISMATCH"
+            ],
+            "example": "DOCUMENT_UPLOAD_CLIENT_PROFILE_MISMATCH"
+          },
+          "message": {
+            "type": "string",
+            "example": "Client profile does not own this matter"
+          },
+          "details": {
+            "$ref": "#/components/schemas/DocumentUploadAuthorizationErrorDetailsDto"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details"
+        ]
+      },
+      "DocumentUploadAuthorizationErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "example": null,
+            "nullable": true
+          },
+          "error": {
+            "$ref": "#/components/schemas/DocumentUploadAuthorizationErrorDto"
+          }
+        },
+        "required": [
+          "data",
+          "error"
         ]
       },
       "CompleteDocumentUploadDto": {
@@ -4521,6 +5636,37 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "CreateNotaryPayoutDto": {
+        "type": "object",
+        "properties": {
+          "matterId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notaryProfileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "example": 2500000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paid",
+              "cancelled"
+            ],
+            "default": "pending"
+          }
+        },
+        "required": [
+          "matterId",
+          "notaryProfileId",
+          "amount"
         ]
       },
       "MarkMilestoneEligibleDto": {
@@ -5053,6 +6199,151 @@
         },
         "required": [
           "code"
+        ]
+      },
+      "UpdateClientLocationDto": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "example": "Jl. Melati No. 10"
+          },
+          "city": {
+            "type": "string",
+            "example": "Jakarta Selatan"
+          },
+          "province": {
+            "type": "string",
+            "example": "DKI Jakarta"
+          },
+          "postalCode": {
+            "type": "string",
+            "example": "12190"
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          }
+        }
+      },
+      "ClientLocationResponseDto": {
+        "type": "object",
+        "properties": {
+          "clientProfileId": {
+            "type": "string"
+          },
+          "address": {
+            "type": "object"
+          },
+          "city": {
+            "type": "object"
+          },
+          "province": {
+            "type": "object"
+          },
+          "postalCode": {
+            "type": "object"
+          },
+          "latitude": {
+            "type": "object"
+          },
+          "longitude": {
+            "type": "object"
+          },
+          "locationUpdatedAt": {
+            "type": "object"
+          }
+        }
+      },
+      "UpdateNotaryLocationDto": {
+        "type": "object",
+        "properties": {
+          "officeAddress": {
+            "type": "string",
+            "example": "Jl. Notaris No. 1"
+          },
+          "officeCity": {
+            "type": "string",
+            "example": "Jakarta Selatan"
+          },
+          "officeProvince": {
+            "type": "string",
+            "example": "DKI Jakarta"
+          },
+          "officePostalCode": {
+            "type": "string",
+            "example": "12190"
+          },
+          "officeLatitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "officeLongitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          }
+        }
+      },
+      "NotaryLocationResponseDto": {
+        "type": "object",
+        "properties": {
+          "notaryProfileId": {
+            "type": "string"
+          },
+          "officeAddress": {
+            "type": "object"
+          },
+          "officeCity": {
+            "type": "object"
+          },
+          "officeProvince": {
+            "type": "object"
+          },
+          "officePostalCode": {
+            "type": "object"
+          },
+          "officeLatitude": {
+            "type": "object"
+          },
+          "officeLongitude": {
+            "type": "object"
+          }
+        }
+      },
+      "NotaryPartnerStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_approval",
+              "approved",
+              "rejected"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "AssignMatterToNotaryDto": {
+        "type": "object",
+        "properties": {
+          "notaryProfileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "notaryProfileId"
         ]
       }
     }
