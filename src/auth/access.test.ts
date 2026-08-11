@@ -42,4 +42,38 @@ describe('canAccess', () => {
     expect(canAccessSettingsTab(['ADMIN_OFFICE'], 'notaries')).toBe(true);
     expect(canAccessSettingsTab(['ADMIN_OFFICE'], 'rates')).toBe(true);
   });
+
+  it('allows intake, office, principal, and super admin to access notary partner modules', () => {
+    const operationalRoles = ['ADMIN_INTAKE', 'ADMIN_OFFICE', 'PRINCIPAL', 'SUPER_ADMIN'] as const;
+
+    operationalRoles.forEach((role) => {
+      expect(canAccess([role], 'notaryPartners')).toBe(true);
+      expect(canAccess([role], 'internalMatching')).toBe(true);
+    });
+  });
+
+  it('blocks finance admin from notary partner and internal matching modules', () => {
+    expect(canAccess(['FINANCE_ADMIN'], 'notaryPartners')).toBe(false);
+    expect(canAccess(['FINANCE_ADMIN'], 'internalMatching')).toBe(false);
+  });
+
+  it('allows finance, principal, and super admin to access notary payouts', () => {
+    expect(canAccess(['FINANCE_ADMIN'], 'notaryPayouts')).toBe(true);
+    expect(canAccess(['PRINCIPAL'], 'notaryPayouts')).toBe(true);
+    expect(canAccess(['SUPER_ADMIN'], 'notaryPayouts')).toBe(true);
+  });
+
+  it('allows multi-role users on new notary routes when one role matches', () => {
+    expect(canAccess(['CLIENT', 'ADMIN_OFFICE'], 'notaryPartners')).toBe(true);
+    expect(canAccess(['CLIENT', 'ADMIN_INTAKE'], 'internalMatching')).toBe(true);
+    expect(canAccess(['CLIENT', 'FINANCE_ADMIN'], 'notaryPayouts')).toBe(true);
+  });
+
+  it('blocks moderator and client from v3 notary modules', () => {
+    (['MODERATION_OFFICER', 'CLIENT'] as const).forEach((role) => {
+      expect(canAccess([role], 'notaryPartners')).toBe(false);
+      expect(canAccess([role], 'internalMatching')).toBe(false);
+      expect(canAccess([role], 'notaryPayouts')).toBe(false);
+    });
+  });
 });

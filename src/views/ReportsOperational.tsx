@@ -5,6 +5,27 @@ import { BarChart3, Calendar, FileSpreadsheet, RotateCcw, TrendingUp } from 'luc
 import { csvEscape } from '../lib/export';
 import { notifyError, notifySuccess } from '../store/ui';
 
+const OPTIONAL_CSV_COLUMNS = [
+  { header: 'Notaris', keys: ['notaryName', 'notary_name'] },
+  { header: 'Notary Profile ID', keys: ['notaryProfileId', 'notary_profile_id'] },
+  { header: 'Notary Payout Status', keys: ['notaryPayoutStatus', 'notary_payout_status'] },
+  { header: 'Notary Payout Amount', keys: ['notaryPayoutAmount', 'notary_payout_amount'] },
+  { header: 'Intake Source', keys: ['intakeSource', 'intake_source'] },
+];
+
+function readFirst(row: any, keys: string[]) {
+  for (const key of keys) {
+    if (row?.[key] !== undefined && row?.[key] !== null) return row[key];
+  }
+  return '';
+}
+
+function getActiveOptionalColumns(rows: any[]) {
+  return OPTIONAL_CSV_COLUMNS.filter((column) =>
+    rows.some((row) => column.keys.some((key) => row?.[key] !== undefined && row?.[key] !== null))
+  );
+}
+
 export default function ReportsOperational() {
   const [period, setPeriod] = useState('2026-06');
   const [serviceType, setServiceType] = useState('all');
@@ -78,7 +99,16 @@ export default function ReportsOperational() {
     try {
       const rawData = reportData?.data || reportData || [];
       const arr = Array.isArray(rawData) ? rawData : [];
-      const headers = 'No. Perkara,Layanan,Klien,Tanggal Pengajuan,Status,Nilai Transaksi\n';
+      const optionalColumns = getActiveOptionalColumns(arr);
+      const headers = [
+        'No. Perkara',
+        'Layanan',
+        'Klien',
+        'Tanggal Pengajuan',
+        'Status',
+        'Nilai Transaksi',
+        ...optionalColumns.map((column) => column.header),
+      ].join(',') + '\n';
       const rows = arr.map((row: any) => {
         const c1 = row.caseNumber || row.no_perkara || '';
         const c2 = row.serviceName || row.layanan || '';
@@ -86,7 +116,8 @@ export default function ReportsOperational() {
         const c4 = row.createdAt ? new Date(row.createdAt).toLocaleDateString('id-ID') : row.tanggal || '';
         const c5 = row.workflowStatus || row.status || '';
         const c6 = row.transactionValue || row.nilai || 0;
-        return [c1, c2, c3, c4, c5, c6].map(csvEscape).join(',');
+        const optionalValues = optionalColumns.map((column) => readFirst(row, column.keys));
+        return [c1, c2, c3, c4, c5, c6, ...optionalValues].map(csvEscape).join(',');
       }).join('\n');
 
       const csv = headers + rows;

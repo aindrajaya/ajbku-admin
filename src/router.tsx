@@ -29,6 +29,10 @@ const Matters = lazy(() => import('./views/Matters'));
 const MatterDetail = lazy(() => import('./views/MatterDetail'));
 const MatterVerify = lazy(() => import('./views/MatterVerify'));
 const EscrowDashboard = lazy(() => import('./views/EscrowDashboard'));
+const NotaryPartners = lazy(() => import('./views/NotaryPartners'));
+const NotaryPartnerDetail = lazy(() => import('./views/NotaryPartnerDetail'));
+const InternalMatching = lazy(() => import('./views/InternalMatching'));
+const NotaryPayouts = lazy(() => import('./views/NotaryPayouts'));
 const ReportsOperational = lazy(() => import('./views/ReportsOperational'));
 const ReportsRepertorium = lazy(() => import('./views/ReportsRepertorium'));
 const Settings = lazy(() => import('./views/Settings'));
@@ -76,6 +80,17 @@ function GuardedPage({ accessKey, children }: { accessKey: Parameters<typeof can
     return <Navigate to="/" replace />;
   }
   return <ErrorBoundary>{children}</ErrorBoundary>;
+}
+
+function ModulePlaceholder({ title }: { title: string }) {
+  return (
+    <div className="glass-panel animate-fade-in" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>{title}</h2>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+        Modul sedang disiapkan untuk implementasi v3.0.
+      </p>
+    </div>
+  );
 }
 
 const rootRoute = createRootRoute({
@@ -136,6 +151,24 @@ const mattersRoute = createRoute({
   component: () => <GuardedPage accessKey="matters"><LazyPage><Matters /></LazyPage></GuardedPage>,
 });
 
+const notaryPartnersRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/notary-partners',
+  component: () => <GuardedPage accessKey="notaryPartners"><LazyPage><NotaryPartners /></LazyPage></GuardedPage>,
+});
+
+const notaryPartnerDetailRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/notary-partners/$id',
+  component: () => <GuardedPage accessKey="notaryPartners"><LazyPage><NotaryPartnerDetail /></LazyPage></GuardedPage>,
+});
+
+const internalMatchingRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/internal-matching',
+  component: () => <GuardedPage accessKey="internalMatching"><LazyPage><InternalMatching /></LazyPage></GuardedPage>,
+});
+
 const matterDetailRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/matters/$id',
@@ -190,6 +223,12 @@ const escrowPayoutsRoute = createRoute({
   component: () => <GuardedPage accessKey="escrow"><EscrowPayouts /></GuardedPage>,
 });
 
+const notaryPayoutsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/notary-payouts',
+  component: () => <GuardedPage accessKey="notaryPayouts"><LazyPage><NotaryPayouts /></LazyPage></GuardedPage>,
+});
+
 const moderationRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/moderation',
@@ -236,6 +275,9 @@ const routeTree = rootRoute.addChildren([
     queueRoute,
     intakeNewRoute,
     mattersRoute,
+    notaryPartnersRoute,
+    notaryPartnerDetailRoute,
+    internalMatchingRoute,
     matterDetailRoute,
     matterVerifyRoute,
     matterAssignmentRoute,
@@ -245,6 +287,7 @@ const routeTree = rootRoute.addChildren([
     chatRoute,
     escrowRoute,
     escrowPayoutsRoute,
+    notaryPayoutsRoute,
     moderationRoute,
     reportsOperationalRoute,
     reportsRepertoriumRoute,

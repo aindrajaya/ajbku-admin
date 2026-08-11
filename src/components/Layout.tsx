@@ -19,9 +19,12 @@ import {
   Sun,
   Moon,
   DollarSign,
+  BadgeDollarSign,
   Settings,
   BarChart3,
   RefreshCcw,
+  Route,
+  UserCheck,
 } from 'lucide-react';
 import { api, type AppRole } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
@@ -41,7 +44,7 @@ function hasElectronApi() {
 }
 
 const navItems: Array<{
-  key: 'dashboard' | 'queue' | 'matters' | 'schedules' | 'chat' | 'escrow' | 'moderation' | 'reports' | 'invitations' | 'audit' | 'settings';
+  key: 'dashboard' | 'queue' | 'matters' | 'notaryPartners' | 'internalMatching' | 'schedules' | 'chat' | 'escrow' | 'notaryPayouts' | 'moderation' | 'reports' | 'invitations' | 'audit' | 'settings';
   to: string;
   label: string;
   icon: React.ReactNode;
@@ -49,9 +52,12 @@ const navItems: Array<{
   { key: 'dashboard', to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { key: 'queue', to: '/queue', label: 'Antrian Pengajuan', icon: <Inbox size={18} /> },
   { key: 'matters', to: '/matters', label: 'Perkara', icon: <FileText size={18} /> },
+  { key: 'notaryPartners', to: '/notary-partners', label: 'Notaris Mitra', icon: <UserCheck size={18} /> },
+  { key: 'internalMatching', to: '/internal-matching', label: 'Internal Matching', icon: <Route size={18} /> },
   { key: 'schedules', to: '/schedules', label: 'Agenda', icon: <Calendar size={18} /> },
   { key: 'chat', to: '/chat', label: 'Komunikasi', icon: <MessageSquare size={18} /> },
   { key: 'escrow', to: '/escrow', label: 'Escrow & Payout', icon: <DollarSign size={18} /> },
+  { key: 'notaryPayouts', to: '/notary-payouts', label: 'Notary Payouts', icon: <BadgeDollarSign size={18} /> },
   { key: 'moderation', to: '/moderation', label: 'Moderasi Chat', icon: <ShieldAlert size={18} /> },
   { key: 'reports', to: '/reports/operational', label: 'Laporan', icon: <BarChart3 size={18} /> },
   { key: 'invitations', to: '/invitations', label: 'Undangan Klien', icon: <UserPlus size={18} /> },
@@ -398,6 +404,9 @@ function getBreadcrumbText(pathname: string) {
   if (pathname === '/') return 'Dashboard';
   if (pathname.startsWith('/queue')) return 'Antrian Pengajuan';
   if (pathname.startsWith('/matters')) return 'Perkara';
+  if (pathname.startsWith('/notary-partners')) return 'Notaris Mitra';
+  if (pathname.startsWith('/internal-matching')) return 'Internal Matching';
+  if (pathname.startsWith('/notary-payouts')) return 'Notary Payouts';
   if (pathname.startsWith('/schedules')) return 'Agenda';
   if (pathname.startsWith('/chat')) return 'Komunikasi';
   if (pathname.startsWith('/moderation')) return 'Moderasi';

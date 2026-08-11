@@ -3,6 +3,11 @@ export const queryKeys = {
   tenantStaffList: (tenantId: string) => ['tenant-staff-list', tenantId] as const,
   tenantNotaries: (tenantId: string) => ['tenant-notaries', tenantId] as const,
   tenantRates: (tenantId: string) => ['tenant-rates', tenantId] as const,
+  notaryPartners: (params?: Record<string, unknown>) => ['notary-partners', params || {}] as const,
+  notaryPartnerDetail: (id: string) => ['notary-partner-detail', id] as const,
+  notaryPartnerAssignedMatters: (id: string) => ['notary-partner-assigned-matters', id] as const,
+  notaryPartnerRecommendations: (matterId: string) => ['notary-partner-recommendations', matterId] as const,
+  notaryPayouts: (params?: Record<string, unknown>) => ['notary-payouts', params || {}] as const,
   notificationsList: () => ['notifications.list'] as const,
   moderationFlaggedMessages: (page?: number, perPage?: number) =>
     page && perPage ? (['moderation.flaggedMessages', page, perPage] as const) : (['moderation.flaggedMessages'] as const),

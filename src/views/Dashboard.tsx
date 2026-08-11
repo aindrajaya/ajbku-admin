@@ -4,8 +4,8 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { getPrimaryAdminRole } from '../auth/access';
-import { normalizeNotificationItem } from '../lib/communication';
 import { buildMatterListParams, extractMatterList } from '../lib/matters';
+import { listNotaryPartners, listNotaryPayouts } from '../lib/notaryPartners';
 import { queryKeys } from '../lib/queryKeys';
 import { 
   FileText, 
@@ -17,6 +17,24 @@ import {
   AlertCircle,
   CheckCircle2
 } from 'lucide-react';
+
+const SELF_SERVICE_INTAKE_SOURCES = new Set(['client_self_service', 'client_mandiri', 'mandiri', 'pwa_client']);
+
+function readMatterSource(matter: any) {
+  return String(
+    matter?.source ||
+    matter?.origin ||
+    matter?.intakeSource ||
+    matter?.intake_source ||
+    matter?.matterSource ||
+    matter?.matter_source ||
+    ''
+  ).trim().toLowerCase();
+}
+
+function isMatterIntakeMandiri(matter: any) {
+  return matter?.workflowStatus === 'intake_submitted' && SELF_SERVICE_INTAKE_SOURCES.has(readMatterSource(matter));
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -59,26 +77,33 @@ export default function Dashboard() {
     }
   });
 
-  // Fetch notifications
-  const { data: notifications = [] } = useQuery({
-    queryKey: queryKeys.notificationsList(),
+  const { data: pendingNotaryPartners = [] } = useQuery({
+    queryKey: queryKeys.notaryPartners({ status: 'pending_approval' }),
     enabled: hasToken,
-    queryFn: async () => {
-      const res = await api.get('/api/v1/notifications');
-      const rows = Array.isArray(res.data) ? res.data : [];
-      return rows.map(normalizeNotificationItem);
-    }
+    queryFn: () => listNotaryPartners({ status: 'pending_approval' }),
+  });
+
+  const { data: pendingNotaryPayouts = [] } = useQuery({
+    queryKey: queryKeys.notaryPayouts({ status: 'pending' }),
+    enabled: hasToken,
+    queryFn: () => listNotaryPayouts({ status: 'pending' }),
   });
 
   // Ensure we are working with arrays to prevent crashes on non-200 responses or invalid payloads
   const safeMatters = Array.isArray(matters) ? matters : [];
-  const safeNotifications = Array.isArray(notifications) ? notifications : [];
   const safeFlaggedMessages = Array.isArray(flaggedMessages) ? flaggedMessages : [];
+  const safePendingNotaryPartners = Array.isArray(pendingNotaryPartners) ? pendingNotaryPartners : [];
+  const safePendingNotaryPayouts = Array.isArray(pendingNotaryPayouts) ? pendingNotaryPayouts : [];
 
   // Calculate metrics
   const activeMatters = safeMatters.filter((m: any) => m && m.workflowStatus !== 'closed' && m.workflowStatus !== 'cancelled');
   const pendingVerifications = safeMatters.filter((m: any) => m && m.workflowStatus === 'documents_under_review');
-  const pendingEscrows = safeNotifications.filter((n: any) => n && typeof n.title === 'string' && (n.title.includes('Escrow') || n.title.includes('Pencairan')));
+  const intakeMandiriMatters = safeMatters.filter(isMatterIntakeMandiri);
+  const hasIntakeMandiriMarker = safeMatters.some((m: any) => readMatterSource(m));
+
+  const renderIntakeMandiriMetric = () => hasIntakeMandiriMarker ? (
+    <MetricCard icon={<FileText size={24} style={{ color: 'var(--color-blue)' }} />} title="Intake Mandiri" value={intakeMandiriMatters.length} subtitle="Client self-service" link="/queue" />
+  ) : null;
 
   const renderMetrics = () => {
     if (role === 'ADMIN_INTAKE' || role === 'ADMIN_OFFICE') {
@@ -90,6 +115,7 @@ export default function Dashboard() {
       return (
         <>
           <MetricCard icon={<FileText size={24} style={{ color: 'var(--color-blue)' }} />} title="Intake Baru" value={intakeNew} subtitle="Menunggu verifikasi" link="/queue" />
+          {renderIntakeMandiriMetric()}
           <MetricCard icon={<AlertCircle size={24} style={{ color: 'var(--color-crimson)' }} />} title="Perlu Revisi" value={needRevision} subtitle="Review manual" link="/queue" />
           <MetricCard icon={<Clock size={24} style={{ color: 'var(--color-gold)' }} />} title="Menunggu Asgn" value={waitingAsgn} subtitle="Penugasan notaris" link="/matters" />
           <MetricCard icon={<CheckCircle2 size={24} style={{ color: 'var(--color-emerald)' }} />} title="Selesai" value={finishedToday} subtitle="Telah di-close" link="/matters" />
@@ -101,7 +127,7 @@ export default function Dashboard() {
       return (
         <>
           <MetricCard icon={<DollarSign size={24} style={{ color: 'var(--color-emerald)' }} />} title="Dana di Escrow" value="Rp 39,5jt" subtitle="Saldo tersimpan" link="/escrow" />
-          <MetricCard icon={<Clock size={24} style={{ color: 'var(--color-gold)' }} />} title="Payout Pending" value={pendingEscrows.length} subtitle="Checker approval" link="/escrow" />
+          <MetricCard icon={<Clock size={24} style={{ color: 'var(--color-gold)' }} />} title="Payout Notaris" value={safePendingNotaryPayouts.length} subtitle="Vendor payout pending" link="/notary-payouts" />
           <MetricCard icon={<CheckCircle2 size={24} style={{ color: 'var(--color-emerald)' }} />} title="Payout Hari Ini" value="1" subtitle="Telah diproses" link="/escrow" />
           <MetricCard icon={<AlertCircle size={24} style={{ color: 'var(--color-crimson)' }} />} title="Mismatch" value="0" subtitle="Rekonsiliasi aman" link="/escrow" />
         </>
@@ -123,8 +149,9 @@ export default function Dashboard() {
       <>
         <MetricCard icon={<FileText size={24} style={{ color: 'var(--color-blue)' }} />} title="Perkara Aktif" value={activeMatters.length} subtitle="Sedang berjalan" link="/matters" />
         <MetricCard icon={<Clock size={24} style={{ color: 'var(--color-gold)' }} />} title="Verifikasi Dokumen" value={pendingVerifications.length} subtitle="Menunggu review" link="/queue" />
-        <MetricCard icon={<ShieldAlert size={24} style={{ color: 'var(--color-crimson)' }} />} title="Pesan Flagged" value={safeFlaggedMessages.length} subtitle="Moderasi chat" link="/moderation" />
-        <MetricCard icon={<DollarSign size={24} style={{ color: 'var(--color-emerald)' }} />} title="Escrow Approval" value={pendingEscrows.length} subtitle="Payout pending" link="/escrow" />
+        <MetricCard icon={<ShieldAlert size={24} style={{ color: 'var(--color-crimson)' }} />} title="Notaris Pending" value={safePendingNotaryPartners.length} subtitle="Menunggu approval" link="/notary-partners" />
+        <MetricCard icon={<DollarSign size={24} style={{ color: 'var(--color-emerald)' }} />} title="Payout Notaris" value={safePendingNotaryPayouts.length} subtitle="Vendor payout pending" link="/notary-payouts" />
+        {renderIntakeMandiriMetric()}
       </>
     );
   };

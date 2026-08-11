@@ -1,9 +1,15 @@
 import React, { useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthProvider';
 import { useRealtimeStore } from '../store/realtime';
 import { queryKeys } from '../lib/queryKeys';
 import { getSupabaseRealtimeClient, removeChannels } from './supabase';
+
+function invalidateQueryFamily(queryClient: QueryClient, familyName: string) {
+  void queryClient.invalidateQueries({
+    predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[0] === familyName,
+  });
+}
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const { status, user } = useAuth();
@@ -95,6 +101,37 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           () => {
             markEvent();
             void queryClient.invalidateQueries({ queryKey: queryKeys.chatThreads() });
+          }
+        )
+        .subscribe(),
+      client
+        .channel(`notary-partners:${user.tenantId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notary_profiles',
+          },
+          () => {
+            markEvent();
+            invalidateQueryFamily(queryClient, 'notary-partners');
+            invalidateQueryFamily(queryClient, 'notary-partner-detail');
+          }
+        )
+        .subscribe(),
+      client
+        .channel(`notary-payouts:${user.tenantId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notary_payouts',
+          },
+          () => {
+            markEvent();
+            invalidateQueryFamily(queryClient, 'notary-payouts');
           }
         )
         .subscribe(),
