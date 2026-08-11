@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Building, Check, DollarSign, Save, Settings, Upload, UserCheck, Users } from 'lucide-react';
-import { api } from '../api/client';
+import { api, type AppRole } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
+import { canAccessSettingsTab } from '../auth/access';
 import {
   useSettingsStore,
   type TenantCoverageAreaDraft,
@@ -15,6 +16,13 @@ import { queryKeys } from '../lib/queryKeys';
 
 type ActiveTab = 'profile' | 'staff' | 'notaries' | 'rates';
 type NoticeTone = 'success' | 'warning' | 'error';
+
+const SETTINGS_TABS: Array<{ key: ActiveTab; label: string; icon: React.ReactNode }> = [
+  { key: 'profile', label: 'Profil Kantor', icon: <Building size={16} /> },
+  { key: 'staff', label: 'Kelola Staf', icon: <Users size={16} /> },
+  { key: 'notaries', label: 'Wilayah Notaris', icon: <UserCheck size={16} /> },
+  { key: 'rates', label: 'Tarif Layanan', icon: <DollarSign size={16} /> },
+];
 
 interface NoticeState {
   tone: NoticeTone;
@@ -171,6 +179,15 @@ export default function SettingsView() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ActiveTab>('profile');
   const { user } = useAuth();
+  const roles = useMemo(() => (user?.roles || []) as AppRole[], [user?.roles]);
+  const visibleTabs = useMemo(
+    () => SETTINGS_TABS.filter((tab) => canAccessSettingsTab(roles, tab.key)),
+    [roles]
+  );
+  const canManageProfile = canAccessSettingsTab(roles, 'profile');
+  const canManageStaff = canAccessSettingsTab(roles, 'staff');
+  const canManageNotaries = canAccessSettingsTab(roles, 'notaries');
+  const canManageRates = canAccessSettingsTab(roles, 'rates');
 
   const tenantId = user?.tenantId || 'tenant-id';
   const tenantSettings = useSettingsStore((state) => state.getTenantSettings(tenantId));
@@ -206,6 +223,7 @@ export default function SettingsView() {
 
   const tenantQuery = useQuery<TenantSettingsDto>({
     queryKey: queryKeys.tenantDetails(tenantId),
+    enabled: canManageProfile,
     queryFn: async () => {
       const res = await api.get<TenantSettingsDto>(`/api/v1/tenants/${tenantId}`);
       return res.data;
@@ -214,6 +232,7 @@ export default function SettingsView() {
 
   const staffListQuery = useQuery<TenantUserItemDto[]>({
     queryKey: queryKeys.tenantStaffList(tenantId),
+    enabled: canManageStaff,
     queryFn: async () => {
       const res = await api.get<TenantUserItemDto[]>(`/api/v1/tenants/${tenantId}/users`);
       return Array.isArray(res.data) ? res.data : [];
@@ -222,6 +241,7 @@ export default function SettingsView() {
 
   const notariesQuery = useQuery<TenantNotaryItemDto[]>({
     queryKey: queryKeys.tenantNotaries(tenantId),
+    enabled: canManageNotaries,
     queryFn: async () => {
       const res = await api.get<TenantNotaryItemDto[]>(`/api/v1/tenants/${tenantId}/notaries`);
       return Array.isArray(res.data) ? res.data : [];
@@ -230,75 +250,107 @@ export default function SettingsView() {
 
   const ratesQuery = useQuery<TenantRatesDto>({
     queryKey: queryKeys.tenantRates(tenantId),
+    enabled: canManageRates,
     queryFn: async () => {
       const res = await api.get<TenantRatesDto>(`/api/v1/tenants/${tenantId}/rates`);
       return res.data;
     },
   });
 
-  useEffect(() => {
-    if (tenantQuery.data && !profileDirty) {
-      const draft = toProfileDraft(tenantQuery.data);
-      setOfficeName(draft.officeName);
-      setOfficeAddress(draft.officeAddress);
-      setOfficePhone(draft.officePhone);
-      setLogoPreview(draft.logoPreview);
-      setLogoStorageKey(draft.logoStorageKey);
-      hydrateTenant(tenantId, { profile: draft });
-      setProfileNotice(null);
-      return;
-    }
-
-    if (tenantQuery.isError && tenantSettings.profile.officeName) {
-      setOfficeName(tenantSettings.profile.officeName);
-      setOfficeAddress(tenantSettings.profile.officeAddress);
-      setOfficePhone(tenantSettings.profile.officePhone);
-      setLogoPreview(tenantSettings.profile.logoPreview);
-      setLogoStorageKey(tenantSettings.profile.logoStorageKey);
-      setProfileNotice({
-        tone: 'warning',
-        message: 'Profile tenant gagal dimuat dari server. Draft lokal dipakai sementara sampai koneksi backend pulih.',
-      });
-    }
-  }, [hydrateTenant, profileDirty, tenantId, tenantQuery.data, tenantQuery.isError, tenantSettings.profile]);
+  const serverProfileDraft = useMemo(
+    () => (tenantQuery.data ? toProfileDraft(tenantQuery.data) : null),
+    [tenantQuery.data]
+  );
+  const serverRatesDraft = useMemo(
+    () => (ratesQuery.data ? toRatesDraft(ratesQuery.data) : null),
+    [ratesQuery.data]
+  );
+  const serverNotaryDrafts = useMemo(
+    () => (notariesQuery.data ? notariesQuery.data.map(toNotaryDraft) : null),
+    [notariesQuery.data]
+  );
 
   useEffect(() => {
-    if (ratesQuery.data && !ratesDirty) {
-      const nextRates = toRatesDraft(ratesQuery.data);
-      setRates(nextRates);
-      setExtraRatesText(serializeExtraRates(nextRates.extraRates));
-      hydrateTenant(tenantId, { rates: nextRates });
-      setRatesNotice(null);
-      return;
+    if (!visibleTabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(visibleTabs[0]?.key || 'profile');
     }
-
-    if (ratesQuery.isError && tenantSettings.rates.baseFee) {
-      setRates(tenantSettings.rates);
-      setExtraRatesText(serializeExtraRates(tenantSettings.rates.extraRates));
-      setRatesNotice({
-        tone: 'warning',
-        message: 'Tarif gagal dimuat dari server. Draft lokal dipakai sementara dan bukan source of truth final.',
-      });
-    }
-  }, [hydrateTenant, ratesDirty, ratesQuery.data, ratesQuery.isError, tenantId, tenantSettings.rates]);
+  }, [activeTab, visibleTabs]);
 
   useEffect(() => {
-    if (notariesQuery.data && !notariesDirty) {
-      const nextNotaries = notariesQuery.data.map(toNotaryDraft);
-      setNotaries(nextNotaries);
-      hydrateTenant(tenantId, { notaries: nextNotaries });
-      setNotaryNotice(null);
-      return;
-    }
+    if (!serverProfileDraft || profileDirty) return;
+    setOfficeName(serverProfileDraft.officeName);
+    setOfficeAddress(serverProfileDraft.officeAddress);
+    setOfficePhone(serverProfileDraft.officePhone);
+    setLogoPreview(serverProfileDraft.logoPreview);
+    setLogoStorageKey(serverProfileDraft.logoStorageKey);
+    hydrateTenant(tenantId, { profile: serverProfileDraft });
+    setProfileNotice(null);
+  }, [hydrateTenant, profileDirty, serverProfileDraft, tenantId]);
 
-    if (notariesQuery.isError && tenantSettings.notaries.length > 0) {
-      setNotaries(tenantSettings.notaries);
-      setNotaryNotice({
-        tone: 'warning',
-        message: 'Coverage notaris gagal dimuat dari server. Draft lokal dipakai sementara dan harus diselaraskan lagi.',
-      });
-    }
-  }, [hydrateTenant, notariesDirty, notariesQuery.data, notariesQuery.isError, tenantId, tenantSettings.notaries]);
+  useEffect(() => {
+    if (!tenantQuery.isError || !tenantSettings.profile.officeName || profileDirty) return;
+    setOfficeName(tenantSettings.profile.officeName);
+    setOfficeAddress(tenantSettings.profile.officeAddress);
+    setOfficePhone(tenantSettings.profile.officePhone);
+    setLogoPreview(tenantSettings.profile.logoPreview);
+    setLogoStorageKey(tenantSettings.profile.logoStorageKey);
+    setProfileNotice({
+      tone: 'warning',
+      message: 'Profile tenant gagal dimuat dari server. Draft lokal dipakai sementara sampai koneksi backend pulih.',
+    });
+  }, [
+    profileDirty,
+    tenantQuery.isError,
+    tenantSettings.profile.logoPreview,
+    tenantSettings.profile.logoStorageKey,
+    tenantSettings.profile.officeAddress,
+    tenantSettings.profile.officeName,
+    tenantSettings.profile.officePhone,
+  ]);
+
+  useEffect(() => {
+    if (!serverRatesDraft || ratesDirty) return;
+    setRates(serverRatesDraft);
+    setExtraRatesText(serializeExtraRates(serverRatesDraft.extraRates));
+    hydrateTenant(tenantId, { rates: serverRatesDraft });
+    setRatesNotice(null);
+  }, [hydrateTenant, ratesDirty, serverRatesDraft, tenantId]);
+
+  useEffect(() => {
+    if (!ratesQuery.isError || !tenantSettings.rates.baseFee || ratesDirty) return;
+    setRates(tenantSettings.rates);
+    setExtraRatesText(serializeExtraRates(tenantSettings.rates.extraRates));
+    setRatesNotice({
+      tone: 'warning',
+      message: 'Tarif gagal dimuat dari server. Draft lokal dipakai sementara dan bukan source of truth final.',
+    });
+  }, [
+    ratesDirty,
+    ratesQuery.isError,
+    tenantSettings.rates.baseFee,
+    tenantSettings.rates.bphtbRate,
+    tenantSettings.rates.certificateCheckFee,
+    tenantSettings.rates.extraRates,
+    tenantSettings.rates.njoptkp,
+    tenantSettings.rates.pphRate,
+    tenantSettings.rates.transferNameFee,
+  ]);
+
+  useEffect(() => {
+    if (!serverNotaryDrafts || notariesDirty) return;
+    setNotaries(serverNotaryDrafts);
+    hydrateTenant(tenantId, { notaries: serverNotaryDrafts });
+    setNotaryNotice(null);
+  }, [hydrateTenant, notariesDirty, serverNotaryDrafts, tenantId]);
+
+  useEffect(() => {
+    if (!notariesQuery.isError || tenantSettings.notaries.length === 0 || notariesDirty) return;
+    setNotaries(tenantSettings.notaries);
+    setNotaryNotice({
+      tone: 'warning',
+      message: 'Coverage notaris gagal dimuat dari server. Draft lokal dipakai sementara dan harus diselaraskan lagi.',
+    });
+  }, [notariesDirty, notariesQuery.isError, tenantSettings.notaries]);
 
   const inviteStaffMutation = useMutation({
     mutationFn: async () => {
@@ -572,14 +624,17 @@ export default function SettingsView() {
 
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]" style={{ alignItems: 'start' }}>
         <div className="glass-panel flex flex-col gap-1 p-2">
-          <SettingsTab active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<Building size={16} />} label="Profil Kantor" />
-          <SettingsTab active={activeTab === 'staff'} onClick={() => setActiveTab('staff')} icon={<Users size={16} />} label="Kelola Staf" />
-          <SettingsTab active={activeTab === 'notaries'} onClick={() => setActiveTab('notaries')} icon={<UserCheck size={16} />} label="Wilayah Notaris" />
-          <SettingsTab active={activeTab === 'rates'} onClick={() => setActiveTab('rates')} icon={<DollarSign size={16} />} label="Tarif Layanan" />
+          {visibleTabs.map((tab) => (
+            <SettingsTab key={tab.key} active={activeTab === tab.key} onClick={() => setActiveTab(tab.key)} icon={tab.icon} label={tab.label} />
+          ))}
         </div>
 
         <div className="glass-panel min-h-[400px] p-8">
-          {activeTab === 'profile' && (
+          {visibleTabs.length === 0 ? (
+            <InlineNotice notice={{ tone: 'error', message: 'Role Anda tidak memiliki akses ke modul Pengaturan.' }} />
+          ) : null}
+
+          {activeTab === 'profile' && canManageProfile && (
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 600, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
                 Profil Tenant & Branding
@@ -653,7 +708,7 @@ export default function SettingsView() {
             </form>
           )}
 
-          {activeTab === 'staff' && (
+          {activeTab === 'staff' && canManageStaff && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {staffNotice && <InlineNotice notice={staffNotice} />}
 
@@ -747,7 +802,7 @@ export default function SettingsView() {
             </div>
           )}
 
-          {activeTab === 'notaries' && (
+          {activeTab === 'notaries' && canManageNotaries && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 600, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
                 Wilayah Kerja Notaris
@@ -865,7 +920,7 @@ export default function SettingsView() {
             </div>
           )}
 
-          {activeTab === 'rates' && (
+          {activeTab === 'rates' && canManageRates && (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
