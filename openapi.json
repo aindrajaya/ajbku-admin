@@ -1897,7 +1897,7 @@
             "access-token": []
           }
         ],
-        "summary": "Notaris menolak assignment",
+        "summary": "Admin menolak kandidat rekomendasi assignment",
         "tags": [
           "assignment"
         ],
@@ -1906,6 +1906,48 @@
           "ADMIN_OFFICE",
           "PRINCIPAL",
           "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/assignment/decline": {
+      "post": {
+        "operationId": "AssignmentController_decline",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectAssignmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Notaris menolak assignment miliknya",
+        "tags": [
+          "assignment"
+        ],
+        "x-roles": [
+          "NOTARY"
         ]
       }
     },
@@ -5022,6 +5064,11 @@
           },
           "assignmentStatus": {
             "type": "string"
+          },
+          "assignedNotaryProfileId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           },
           "paymentStatus": {
             "type": "string"
