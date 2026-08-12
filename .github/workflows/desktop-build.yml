@@ -1,0 +1,107 @@
+name: Build Desktop Installers
+
+on:
+  # Manual build from GitHub Actions
+  workflow_dispatch:
+
+  # Build automatically when creating version tags
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+
+  # ============================================================
+  # Windows
+  # ============================================================
+
+  build-windows:
+    name: Windows NSIS Installer
+    runs-on: windows-latest
+
+    timeout-minutes: 30
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows installer
+        run: npm run package:win
+
+      - name: Show generated files
+        shell: pwsh
+        run: |
+          Get-ChildItem dist-electron-build -Recurse
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: AJBku-Admin-Windows-${{ github.ref_name }}
+          path: |
+            dist-electron-build/*.exe
+            dist-electron-build/*.blockmap
+            dist-electron-build/latest.yml
+          if-no-files-found: error
+          retention-days: 7
+
+
+  # ============================================================
+  # macOS
+  # ============================================================
+
+  build-macos:
+    name: macOS Universal DMG
+    runs-on: macos-latest
+
+    timeout-minutes: 40
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS installer
+        run: npm run package:mac
+
+      - name: Show generated files
+        run: |
+          find dist-electron-build -maxdepth 2 -type f -print
+
+      - name: Upload macOS installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: AJBku-Admin-macOS-${{ github.ref_name }}
+          path: |
+            dist-electron-build/*.dmg
+            dist-electron-build/*.zip
+            dist-electron-build/*.blockmap
+            dist-electron-build/latest-mac.yml
+          if-no-files-found: error
+          retention-days: 7
