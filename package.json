@@ -15,8 +15,8 @@
     "electron:start": "electron .",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5175 && npm run electron:start\"",
     "dist": "npm run build && electron-builder",
-    "package:win": "npm run build && electron-builder --win nsis --x64",
-    "package:mac": "npm run build && electron-builder --mac --universal"
+    "package:win": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "package:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never"
   },
   "build": {
     "appId": "id.ajbku.admin",
