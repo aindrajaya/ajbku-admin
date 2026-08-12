@@ -25,5 +25,4 @@ dist-ssr
 
 /docs
 /dist-electron-build
-/build-resources
 /test-results
