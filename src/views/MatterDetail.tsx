@@ -3,6 +3,8 @@ import { useParams, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import axios from 'axios';
+import { useAuth } from '../auth/AuthProvider';
+import { canCreateMatterTimelineEvent } from '../auth/access';
 import { getAssignmentDocumentIssues } from '../lib/assignmentEligibility';
 import { normalizeBodyText, normalizeChatMessage, normalizeChatThread } from '../lib/communication';
 import type { ChatMessage, ChatThread } from '../lib/communication';
@@ -41,6 +43,7 @@ export default function MatterDetail() {
   const { id } = useParams({ strict: false }) as { id: string };
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   
   // Tab State
   const [activeTab, setActiveTab] = useState<'docs' | 'assign' | 'payments' | 'escrow' | 'bpn' | 'agenda' | 'chat'>('docs');
@@ -48,6 +51,7 @@ export default function MatterDetail() {
   // Matter workflow status edit state
   const [editingStatus, setEditingStatus] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [manualTimelineNote, setManualTimelineNote] = useState('');
 
   // Fetch Matter details
   const { data: matter, isLoading: isLoadingMatter } = useQuery({
@@ -58,7 +62,7 @@ export default function MatterDetail() {
     }
   });
 
-  // Fetch matter activity from audit events first, with timeline fallback for older backend builds.
+  // Fetch matter activity from the matter timeline first; audit events are only a fallback for older backend builds.
   const {
     data: timeline = [],
     isLoading: isLoadingTimeline,
@@ -68,31 +72,36 @@ export default function MatterDetail() {
     queryKey: ['matters', id, 'activity-log'],
     queryFn: async () => {
       try {
-        const auditRes = await api.get('/api/v1/audit-events', { matterId: id, page: 1, limit: 50 });
-        const auditRows = extractMatterActivityRows(auditRes.data);
-        if (auditRows?.length) {
-          const auditActivities = normalizeMatterActivities(auditRows, 'audit');
-          if (auditActivities.length) return auditActivities;
+        const timelineRes = await api.get(`/api/v1/matters/${id}/timeline`);
+        const timelineRows = Array.isArray(timelineRes.data) ? timelineRes.data : null;
+        if (!timelineRows) {
+          throw new Error('Format respons timeline perkara tidak valid.');
         }
+        const timelineActivities = normalizeMatterActivities(timelineRows, 'timeline');
+        if (timelineRows.length > 0 && timelineActivities.length === 0) {
+          throw new Error('Data timeline perkara tidak valid.');
+        }
+        return timelineActivities;
       } catch {
-        // Fall back to matter timeline when audit filtering is not available yet.
+        // Fall back to audit events when the timeline endpoint is not available yet.
       }
 
-      const timelineRes = await api.get(`/api/v1/matters/${id}/timeline`);
-      const timelineRows = extractMatterActivityRows(timelineRes.data);
-      if (!timelineRows) {
-        throw new Error('Format respons timeline perkara tidak valid.');
+      const auditRes = await api.get('/api/v1/audit-events', { matterId: id, page: 1, limit: 50 });
+      const auditRows = extractMatterActivityRows(auditRes.data);
+      if (!auditRows) {
+        throw new Error('Format respons audit perkara tidak valid.');
       }
-      const timelineActivities = normalizeMatterActivities(timelineRows, 'timeline');
-      if (timelineRows.length > 0 && timelineActivities.length === 0) {
-        throw new Error('Data timeline perkara tidak valid.');
+      const auditActivities = normalizeMatterActivities(auditRows, 'audit');
+      if (auditRows.length > 0 && auditActivities.length === 0) {
+        throw new Error('Data audit perkara tidak valid.');
       }
-      return timelineActivities;
+      return auditActivities;
     },
     enabled: !!id
   });
 
   const safeTimeline = Array.isArray(timeline) ? timeline : [];
+  const canAddManualTimelineNote = canCreateMatterTimelineEvent(user?.roles);
 
   // Mutate workflow status
   const updateStatusMutation = useMutation({
@@ -106,6 +115,24 @@ export default function MatterDetail() {
       refetchTimeline();
       notifySuccess('Status perkara berhasil diperbarui.');
     }
+  });
+
+  const addManualTimelineNoteMutation = useMutation({
+    mutationFn: async (description: string) => {
+      await api.post(`/api/v1/matters/${id}/timeline`, {
+        statusCode: 'manual_note',
+        title: 'Catatan manual ditambahkan',
+        description,
+      });
+    },
+    onSuccess: async () => {
+      setManualTimelineNote('');
+      await refetchTimeline();
+      notifySuccess('Catatan timeline berhasil ditambahkan.');
+    },
+    onError: (error) => {
+      notifyError(getApiErrorMessage(error, 'Gagal menambahkan catatan timeline.'));
+    },
   });
 
   // Extract and normalize the matter data defensively
@@ -238,6 +265,47 @@ export default function MatterDetail() {
           {/* Timeline History log */}
           <div className="glass-panel" style={{ padding: '1.25rem', maxHeight: '350px', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>Log Perkara</h3>
+
+            {canAddManualTimelineNote ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const note = manualTimelineNote.trim();
+                  if (!note) return;
+                  addManualTimelineNoteMutation.mutate(note);
+                }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  paddingBottom: '0.75rem',
+                  marginBottom: '0.75rem',
+                  borderBottom: '1px solid var(--border-glass)',
+                }}
+              >
+                <label className="input-label" htmlFor="manual-timeline-note" style={{ fontSize: '0.72rem' }}>
+                  Catatan Manual
+                </label>
+                <textarea
+                  id="manual-timeline-note"
+                  className="input-field"
+                  rows={3}
+                  value={manualTimelineNote}
+                  onChange={(event) => setManualTimelineNote(event.target.value)}
+                  placeholder="Tulis catatan timeline perkara"
+                  style={{ fontSize: '0.78rem', resize: 'vertical', minHeight: '72px' }}
+                />
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={!manualTimelineNote.trim() || addManualTimelineNoteMutation.isPending}
+                  style={{ padding: '0.45rem 0.75rem', fontSize: '0.75rem', justifyContent: 'center' }}
+                >
+                  <Plus size={14} />
+                  {addManualTimelineNoteMutation.isPending ? 'Menyimpan...' : 'Tambah Catatan'}
+                </button>
+              </form>
+            ) : null}
             
             <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {isLoadingTimeline ? (
@@ -261,26 +329,33 @@ export default function MatterDetail() {
                   Belum ada aktivitas perkara tercatat.
                 </div>
               ) : (
-                safeTimeline.map((evt) => (
-                  <div key={evt.id} style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <Activity size={14} style={{ color: 'var(--color-emerald)', flexShrink: 0 }} />
-                      <div style={{ width: '1px', flex: 1, backgroundColor: 'var(--border-glass)', margin: '0.25rem 0' }} />
+                safeTimeline.map((evt) => {
+                  const happenedAtLabel = evt.createdAt
+                    ? new Date(evt.createdAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+                    : 'Waktu tidak tersedia';
+
+                  return (
+                    <div key={evt.id} style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <Activity size={14} style={{ color: 'var(--color-emerald)', flexShrink: 0 }} />
+                        <div style={{ width: '1px', flex: 1, backgroundColor: 'var(--border-glass)', margin: '0.25rem 0' }} />
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{evt.title}</span>
+                        {evt.aggregateType ? (
+                          <span className="badge badge-gray" style={{ marginLeft: '0.35rem', fontSize: '0.6rem' }}>{evt.aggregateType}</span>
+                        ) : null}
+                        {evt.description ? (
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', margin: '0.1rem 0' }}>{evt.description}</p>
+                        ) : null}
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          {happenedAtLabel}
+                          {evt.actorName ? ` - oleh ${evt.actorName}` : null}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{evt.title}</span>
-                      {evt.aggregateType ? (
-                        <span className="badge badge-gray" style={{ marginLeft: '0.35rem', fontSize: '0.6rem' }}>{evt.aggregateType}</span>
-                      ) : null}
-                      {evt.description ? (
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', margin: '0.1rem 0' }}>{evt.description}</p>
-                      ) : null}
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        {evt.createdAt ? new Date(evt.createdAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : 'Waktu tidak tersedia'} • {evt.actorName}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
