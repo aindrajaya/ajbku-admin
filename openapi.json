@@ -1456,7 +1456,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatterTimelineDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1467,6 +1474,12 @@
         "summary": "Tambah event ke timeline matter",
         "tags": [
           "matters"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
         ]
       },
       "get": {
@@ -1483,7 +1496,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatterTimelineDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1494,6 +1517,15 @@
         "summary": "Timeline history matter",
         "tags": [
           "matters"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "FINANCE_ADMIN",
+          "MODERATION_OFFICER",
+          "NOTARY",
+          "CLIENT"
         ]
       }
     },
@@ -4900,6 +4932,55 @@
           "updated_at"
         ]
       },
+      "MatterTimelineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "matterId": {
+            "type": "string"
+          },
+          "statusCode": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "sourceModule": {
+            "type": "object",
+            "nullable": true
+          },
+          "actorUserId": {
+            "type": "object",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "actorName": {
+            "type": "object",
+            "nullable": true
+          },
+          "happenedAt": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "matterId",
+          "statusCode",
+          "title",
+          "happenedAt"
+        ]
+      },
       "MatterDocumentLatestVersionDto": {
         "type": "object",
         "properties": {
@@ -5066,7 +5147,7 @@
             "type": "string"
           },
           "assignedNotaryProfileId": {
-            "type": "string",
+            "type": "object",
             "nullable": true,
             "format": "uuid"
           },
@@ -5101,7 +5182,7 @@
           "timelines": {
             "type": "array",
             "items": {
-              "type": "object"
+              "$ref": "#/components/schemas/MatterTimelineDto"
             }
           },
           "documents": {
