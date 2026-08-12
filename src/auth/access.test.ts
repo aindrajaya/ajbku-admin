@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canAccess, canAccessSettingsTab, canVerifyDocuments } from './access';
+import { canAccess, canAccessSettingsTab, canCreateMatterTimelineEvent, canVerifyDocuments } from './access';
 
 describe('canAccess', () => {
   it('blocks moderator from escrow module', () => {
@@ -21,6 +21,16 @@ describe('canAccess', () => {
     expect(canVerifyDocuments(['SUPER_ADMIN'])).toBe(true);
     expect(canVerifyDocuments(['ADMIN_OFFICE'])).toBe(true);
     expect(canVerifyDocuments(['FINANCE_ADMIN'])).toBe(false);
+  });
+
+  it('allows only operational admin roles to create matter timeline events', () => {
+    (['ADMIN_INTAKE', 'ADMIN_OFFICE', 'PRINCIPAL', 'SUPER_ADMIN'] as const).forEach((role) => {
+      expect(canCreateMatterTimelineEvent([role])).toBe(true);
+    });
+
+    (['FINANCE_ADMIN', 'MODERATION_OFFICER', 'NOTARY', 'CLIENT'] as const).forEach((role) => {
+      expect(canCreateMatterTimelineEvent([role])).toBe(false);
+    });
   });
 
   it('exposes settings route to every role with at least one settings tab', () => {

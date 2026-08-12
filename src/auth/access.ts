@@ -20,6 +20,18 @@ export const routeAccess = {
 
 export const documentVerificationRoles = ['ADMIN_INTAKE', 'PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_OFFICE'] satisfies AppRole[];
 
+export const timelineReadRoles = [
+  'ADMIN_INTAKE',
+  'ADMIN_OFFICE',
+  'PRINCIPAL',
+  'FINANCE_ADMIN',
+  'MODERATION_OFFICER',
+  'NOTARY',
+  'CLIENT',
+] satisfies AppRole[];
+
+export const timelineCreateRoles = ['ADMIN_INTAKE', 'ADMIN_OFFICE', 'PRINCIPAL', 'SUPER_ADMIN'] satisfies AppRole[];
+
 export const settingsAccess = {
   profile: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE'],
   staff: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE'],
@@ -38,6 +50,10 @@ export function canAccess(roles: readonly AppRole[] | null | undefined, key: key
 
 export function canVerifyDocuments(roles: readonly AppRole[] | null | undefined) {
   return hasAnyRole(roles, documentVerificationRoles);
+}
+
+export function canCreateMatterTimelineEvent(roles: readonly AppRole[] | null | undefined) {
+  return hasAnyRole(roles, timelineCreateRoles);
 }
 
 export function canAccessSettingsTab(roles: readonly AppRole[] | null | undefined, tab: keyof typeof settingsAccess) {
