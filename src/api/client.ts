@@ -54,6 +54,11 @@ export interface AuthStateSnapshot {
   officeId: string | null;
 }
 
+export interface RealtimeAuthToken {
+  accessToken: string;
+  userId: string;
+}
+
 export function getApiBaseUrl(): string {
   const saved = localStorage.getItem(BASE_URL_KEY);
   if (saved) {
@@ -196,6 +201,7 @@ async function refreshBrowserAuthToken(): Promise<string | null> {
     await sessionStorageBridge.set('accessToken', newAccess);
     await sessionStorageBridge.set('refreshToken', newRefresh);
     await sessionStorageBridge.set('tokenExpiresAt', String(Date.now() + 15 * 60 * 1000));
+    window.dispatchEvent(new Event('ajbku-auth-token-refreshed'));
     return newAccess;
   } catch {
     await sessionStorageBridge.clearAuth();
@@ -316,6 +322,52 @@ export async function getAuthSnapshot(): Promise<AuthStateSnapshot> {
   ]);
 
   return { accessToken, refreshToken, tokenExpiresAt, tenantId, officeId };
+}
+
+function decodeJwtClaims(token: string): Record<string, unknown> | null {
+  const [, encodedClaims] = token.split('.');
+  if (!encodedClaims) return null;
+
+  try {
+    const base64 = encodedClaims.replace(/-/g, '+').replace(/_/g, '/');
+    const json = window.atob(base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '='));
+    const claims = JSON.parse(json);
+    return claims && typeof claims === 'object' ? claims as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function isSupabaseRlsToken(token: string, userId: string): boolean {
+  const claims = decodeJwtClaims(token);
+  if (!claims || claims.sub !== userId || claims.role !== 'authenticated') return false;
+
+  const audience = claims.aud;
+  return audience === 'authenticated' || (Array.isArray(audience) && audience.includes('authenticated'));
+}
+
+/**
+ * Returns only a dashboard session token that has the claims Supabase RLS
+ * expects. The Realtime service still verifies the JWT signature.
+ */
+export async function getRealtimeAuthToken(): Promise<RealtimeAuthToken | null> {
+  if (isElectron()) {
+    const session = await getElectronPublicSession();
+    if (!session.user) return null;
+
+    const accessToken = await window.electronAPI.auth.getRealtimeToken({ baseUrl: getApiBaseUrl() });
+    return accessToken && isSupabaseRlsToken(accessToken, session.user.id)
+      ? { accessToken, userId: session.user.id }
+      : null;
+  }
+
+  const [accessToken, session] = await Promise.all([
+    sessionStorageBridge.get('accessToken'),
+    getPublicAuthSession(),
+  ]);
+  return accessToken && session.user && isSupabaseRlsToken(accessToken, session.user.id)
+    ? { accessToken, userId: session.user.id }
+    : null;
 }
 
 export async function getPublicAuthSession(): Promise<PublicAuthSession> {

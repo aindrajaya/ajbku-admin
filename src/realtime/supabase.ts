@@ -1,4 +1,5 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
+import { getRealtimeAuthToken } from '../api/client';
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -12,6 +13,7 @@ export function getSupabaseRealtimeClient() {
 
   if (!supabaseClient) {
     supabaseClient = createClient(url, anonKey, {
+      accessToken: async () => (await getRealtimeAuthToken())?.accessToken ?? anonKey,
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -36,4 +38,13 @@ export function removeChannels(channels: RealtimeChannel[]) {
   channels.forEach((channel) => {
     void client.removeChannel(channel);
   });
+}
+
+export async function clearRealtimeAuth(client: SupabaseClient) {
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  await client.removeAllChannels();
+  if (anonKey) {
+    await client.realtime.setAuth(anonKey);
+  }
+  await client.realtime.disconnect();
 }

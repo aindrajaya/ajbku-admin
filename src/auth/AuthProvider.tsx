@@ -13,6 +13,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   tenantCode: string;
   pendingAuth: PendingAuthState | null;
+  realtimeTokenVersion: number;
   setTenantCode: (value: string) => void;
   loginWithCredentials: (payload: { tenantCode: string; email: string; password: string }) => Promise<{ needsTotp: boolean }>;
   completeTotpLogin: (totpCode: string) => Promise<void>;
@@ -32,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [tenantCode, setTenantCodeState] = useState('');
   const [pendingAuth, setPendingAuth] = useState<PendingAuthState | null>(null);
+  const [realtimeTokenVersion, setRealtimeTokenVersion] = useState(0);
 
   useEffect(() => {
     sessionStorageBridge.get('savedTenantCode').then((value) => {
@@ -100,16 +102,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     window.addEventListener('ajbku-logout', handleLogout);
+    const handleTokenRefresh = () => {
+      if (active) setRealtimeTokenVersion((version) => version + 1);
+    };
+    window.addEventListener('ajbku-auth-token-refreshed', handleTokenRefresh);
     const detach = isElectron()
       ? window.electronAPI.auth.onLogout(() => {
           window.dispatchEvent(new Event('ajbku-logout'));
         })
       : undefined;
+    const detachSessionChanged = isElectron()
+      ? window.electronAPI.auth.onSessionChanged(handleTokenRefresh)
+      : undefined;
 
     return () => {
       active = false;
       window.removeEventListener('ajbku-logout', handleLogout);
+      window.removeEventListener('ajbku-auth-token-refreshed', handleTokenRefresh);
       detach?.();
+      detachSessionChanged?.();
     };
   }, []);
 
@@ -119,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       tenantCode,
       pendingAuth,
+      realtimeTokenVersion,
       setTenantCode: (value) => {
         setTenantCodeState(value);
         void sessionStorageBridge.set('savedTenantCode', value);
@@ -254,7 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       refreshProfile,
     }),
-    [pendingAuth, status, tenantCode, user]
+    [pendingAuth, realtimeTokenVersion, status, tenantCode, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
