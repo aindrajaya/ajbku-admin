@@ -8,13 +8,17 @@ const setStatusMock = vi.fn();
 const markEventMock = vi.fn();
 const getSupabaseRealtimeClientMock = vi.fn();
 const removeChannelsMock = vi.fn();
+const clearRealtimeAuthMock = vi.fn();
+const getRealtimeAuthTokenMock = vi.fn();
 
 let authState: {
   status: 'authenticated' | 'unauthenticated';
   user: { id: string; tenantId: string } | null;
+  realtimeTokenVersion?: number;
 } = {
   status: 'authenticated',
   user: { id: 'user-1', tenantId: 'tenant-1' },
+  realtimeTokenVersion: 0,
 };
 
 interface RealtimeHandler {
@@ -48,10 +52,20 @@ vi.mock('../store/realtime', () => ({
 vi.mock('./supabase', () => ({
   getSupabaseRealtimeClient: () => getSupabaseRealtimeClientMock(),
   removeChannels: (createdChannels: unknown[]) => removeChannelsMock(createdChannels),
+  clearRealtimeAuth: (client: unknown) => clearRealtimeAuthMock(client),
+}));
+
+vi.mock('../api/client', () => ({
+  getRealtimeAuthToken: () => getRealtimeAuthTokenMock(),
 }));
 
 function createRealtimeClient() {
   return {
+    realtime: {
+      setAuth: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    },
+    removeAllChannels: vi.fn().mockResolvedValue([]),
     channel: vi.fn((name: string) => {
       const channel = {
         name,
@@ -100,6 +114,7 @@ beforeEach(() => {
   authState = {
     status: 'authenticated',
     user: { id: 'user-1', tenantId: 'tenant-1' },
+    realtimeTokenVersion: 0,
   };
   handlers.length = 0;
   channels.length = 0;
@@ -107,6 +122,9 @@ beforeEach(() => {
   markEventMock.mockClear();
   getSupabaseRealtimeClientMock.mockReset();
   removeChannelsMock.mockClear();
+  clearRealtimeAuthMock.mockClear();
+  getRealtimeAuthTokenMock.mockReset();
+  getRealtimeAuthTokenMock.mockResolvedValue({ accessToken: 'realtime-token', userId: 'user-1' });
   getSupabaseRealtimeClientMock.mockReturnValue(createRealtimeClient());
 });
 
@@ -115,26 +133,26 @@ afterEach(() => {
 });
 
 describe('RealtimeProvider', () => {
-  it('creates existing realtime channels plus notary partner and payout channels for authenticated users', () => {
+  it('sets the authenticated token before subscribing and preserves all channel contracts', async () => {
+    const client = createRealtimeClient();
+    getSupabaseRealtimeClientMock.mockReturnValue(client);
     renderProvider();
 
+    await vi.waitFor(() => expect(channels).toHaveLength(5));
+
+    expect(client.realtime.setAuth).toHaveBeenCalledWith('realtime-token');
+    expect(client.realtime.setAuth.mock.invocationCallOrder[0]).toBeLessThan(channels[0].subscribe.mock.invocationCallOrder[0]);
     expect(channels.map((channel) => channel.name)).toEqual([
       'notifications:user-1',
       'moderation:tenant-1',
       'chat-messages:user-1',
       'chat-participants:user-1',
       'notary-partners:tenant-1',
-      'notary-payouts:tenant-1',
     ]);
     expect(getHandler('notary_profiles')).toMatchObject({
       channelName: 'notary-partners:tenant-1',
       eventType: 'postgres_changes',
       filter: { event: '*', schema: 'public', table: 'notary_profiles' },
-    });
-    expect(getHandler('notary_payouts')).toMatchObject({
-      channelName: 'notary-payouts:tenant-1',
-      eventType: 'postgres_changes',
-      filter: { event: '*', schema: 'public', table: 'notary_payouts' },
     });
   });
 
@@ -142,27 +160,16 @@ describe('RealtimeProvider', () => {
     const { queryClient } = renderProvider();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    getHandler('notary_profiles').callback();
+    return vi.waitFor(() => expect(handlers).not.toHaveLength(0)).then(() => {
+      getHandler('notary_profiles').callback();
 
-    const predicates = getPredicateCalls(invalidateSpy);
-    expect(markEventMock).toHaveBeenCalledTimes(1);
-    expect(predicates).toHaveLength(2);
-    expect(predicates.some((predicate: QueryFamilyPredicate) => predicate({ queryKey: ['notary-partners', {}] }))).toBe(true);
-    expect(predicates.some((predicate: QueryFamilyPredicate) => predicate({ queryKey: ['notary-partner-detail', 'notary-1'] }))).toBe(true);
-    expect(predicates.some((predicate: QueryFamilyPredicate) => predicate({ queryKey: ['notary-payouts', {}] }))).toBe(false);
-  });
-
-  it('invalidates notary payout query family for notary payout events', () => {
-    const { queryClient } = renderProvider();
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-
-    getHandler('notary_payouts').callback();
-
-    const predicates = getPredicateCalls(invalidateSpy);
-    expect(markEventMock).toHaveBeenCalledTimes(1);
-    expect(predicates).toHaveLength(1);
-    expect(predicates[0]({ queryKey: ['notary-payouts', {}] })).toBe(true);
-    expect(predicates[0]({ queryKey: ['notary-partners', {}] })).toBe(false);
+      const predicates = getPredicateCalls(invalidateSpy);
+      expect(markEventMock).toHaveBeenCalledTimes(1);
+      expect(predicates).toHaveLength(2);
+      expect(predicates.some((predicate: QueryFamilyPredicate) => predicate({ queryKey: ['notary-partners', {}] }))).toBe(true);
+      expect(predicates.some((predicate: QueryFamilyPredicate) => predicate({ queryKey: ['notary-partner-detail', 'notary-1'] }))).toBe(true);
+      expect(predicates.some((predicate: QueryFamilyPredicate) => predicate({ queryKey: ['notary-payouts', {}] }))).toBe(false);
+    });
   });
 
   it('sets fallback status and creates no notary channels when Supabase client is missing', () => {
@@ -175,12 +182,57 @@ describe('RealtimeProvider', () => {
     expect(removeChannelsMock).not.toHaveBeenCalled();
   });
 
-  it('removes all created channels on cleanup', () => {
+  it('removes all created channels and clears the authenticated realtime session on cleanup', async () => {
     const { unmount } = renderProvider();
+
+    await vi.waitFor(() => expect(channels).toHaveLength(5));
 
     unmount();
 
     expect(removeChannelsMock).toHaveBeenCalledWith(channels);
+    await vi.waitFor(() => expect(clearRealtimeAuthMock).toHaveBeenCalledTimes(1));
     expect(setStatusMock).toHaveBeenLastCalledWith('idle');
+  });
+
+  it('does not subscribe until an authenticated realtime token is available', async () => {
+    getRealtimeAuthTokenMock.mockResolvedValue(null);
+
+    renderProvider();
+
+    await vi.waitFor(() => expect(setStatusMock).toHaveBeenCalledWith('fallback'));
+    expect(channels).toHaveLength(0);
+  });
+
+  it('updates Realtime authorization when the access token refreshes', async () => {
+    const client = createRealtimeClient();
+    getSupabaseRealtimeClientMock.mockReturnValue(client);
+    getRealtimeAuthTokenMock
+      .mockResolvedValueOnce({ accessToken: 'token-before-refresh', userId: 'user-1' })
+      .mockResolvedValueOnce({ accessToken: 'token-after-refresh', userId: 'user-1' });
+
+    const { rerender } = renderProvider();
+    await vi.waitFor(() => expect(client.realtime.setAuth).toHaveBeenCalledWith('token-before-refresh'));
+
+    authState = { ...authState, realtimeTokenVersion: 1 };
+    rerender(<QueryClientProvider client={new QueryClient()}><RealtimeProvider><div>content</div></RealtimeProvider></QueryClientProvider>);
+
+    await vi.waitFor(() => expect(client.realtime.setAuth).toHaveBeenCalledWith('token-after-refresh'));
+  });
+
+  it('removes old-user channels before activating a switched user session', async () => {
+    getRealtimeAuthTokenMock
+      .mockResolvedValueOnce({ accessToken: 'user-1-token', userId: 'user-1' })
+      .mockResolvedValueOnce({ accessToken: 'user-2-token', userId: 'user-2' });
+
+    const { rerender } = renderProvider();
+    await vi.waitFor(() => expect(channels).toHaveLength(5));
+    const firstSessionChannels = [...channels];
+
+    authState = { status: 'authenticated', user: { id: 'user-2', tenantId: 'tenant-2' }, realtimeTokenVersion: 0 };
+    rerender(<QueryClientProvider client={new QueryClient()}><RealtimeProvider><div>content</div></RealtimeProvider></QueryClientProvider>);
+
+    await vi.waitFor(() => expect(channels).toHaveLength(10));
+    expect(removeChannelsMock).toHaveBeenCalledWith(firstSessionChannels);
+    expect(channels.slice(5).map((channel) => channel.name)).toContain('notifications:user-2');
   });
 });

@@ -66,8 +66,10 @@ interface Window {
       verifyTotp: (payload: { otp: string; baseUrl: string }) => Promise<any>;
       getSession: (payload: { baseUrl: string }) => Promise<ElectronPublicSession>;
       refreshSession: (payload: { baseUrl: string }) => Promise<ElectronPublicSession>;
+      getRealtimeToken: (payload: { baseUrl: string }) => Promise<string | null>;
       logout: (payload: { baseUrl: string }) => Promise<boolean>;
       onLogout: (listener: () => void) => () => void;
+      onSessionChanged: (listener: () => void) => () => void;
     };
     http: {
       request: (payload: {

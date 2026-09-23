@@ -11,11 +11,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     verifyTotp: (payload) => ipcRenderer.invoke('auth:verify-totp', payload),
     getSession: (payload) => ipcRenderer.invoke('auth:get-session', payload),
     refreshSession: (payload) => ipcRenderer.invoke('auth:refresh-session', payload),
+    getRealtimeToken: (payload) => ipcRenderer.invoke('auth:get-realtime-token', payload),
     logout: (payload) => ipcRenderer.invoke('auth:logout', payload),
     onLogout: (listener) => {
       const wrapped = () => listener();
       ipcRenderer.on('auth:logout', wrapped);
       return () => ipcRenderer.removeListener('auth:logout', wrapped);
+    },
+    onSessionChanged: (listener) => {
+      const wrapped = () => listener();
+      ipcRenderer.on('auth:session-changed', wrapped);
+      return () => ipcRenderer.removeListener('auth:session-changed', wrapped);
     },
   },
   http: {

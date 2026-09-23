@@ -703,6 +703,11 @@ function setupIpcHandlers() {
     return sessionState;
   });
 
+  ipcMain.handle('auth:get-realtime-token', async () => {
+    await ensureFreshAuthSession(API_BASE_URL);
+    return authSession?.accessToken || null;
+  });
+
   ipcMain.handle('auth:refresh-session', async () => {
     await refreshAuthSession(API_BASE_URL);
     return getPublicSession();
