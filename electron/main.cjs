@@ -6,8 +6,7 @@ const Store = require('electron-store').default;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const APP_RUNTIME_NAME = isDev ? 'AJBku Admin Dev' : 'AJBku Admin';
 const DEV_SERVER_URL = 'http://localhost:5175';
-const API_BASE_URL = 'https://net-lauren-aindrajaya-5a2990e1.koyeb.app';
-// const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'https://api.ajbku.id';
 const DEV_SERVER_ORIGINS = `${DEV_SERVER_URL} http://127.0.0.1:5175`;
 
 function logAuthDiagnostic(event, details = {}) {
@@ -344,6 +343,9 @@ async function refreshAuthSession(baseUrl) {
       apiBaseUrl: baseUrl,
     };
     writeSecureSession(authSession);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('auth:session-changed');
+    }
     logAuthDiagnostic('refresh-stored', {
       tokenStored: typeof authSession.accessToken === 'string',
       tokenReadBack: !!sanitizeStoredSession(readSecureSession())?.accessToken,
@@ -483,7 +485,7 @@ function setupSecurityHeaders() {
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
         "font-src 'self' data: https://fonts.gstatic.com; " +
         "img-src 'self' data: blob: https:; " +
-        "connect-src 'self' https://net-lauren-aindrajaya-5a2990e1.koyeb.app ws: wss:; " +
+        "connect-src 'self' https://api.ajbku.id https://storage.ajbku.id wss:; " +
         "frame-src 'self' blob: https:; " +
         "object-src 'none'; base-uri 'self'; form-action 'self';";
 
