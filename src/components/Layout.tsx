@@ -25,6 +25,7 @@ import {
   RefreshCcw,
   Route,
   UserCheck,
+  BadgeCheck,
 } from 'lucide-react';
 import { api, type AppRole } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
@@ -44,7 +45,7 @@ function hasElectronApi() {
 }
 
 const navItems: Array<{
-  key: 'dashboard' | 'queue' | 'matters' | 'notaryPartners' | 'internalMatching' | 'schedules' | 'chat' | 'escrow' | 'notaryPayouts' | 'moderation' | 'reports' | 'invitations' | 'audit' | 'settings';
+  key: 'dashboard' | 'queue' | 'matters' | 'notaryPartners' | 'internalMatching' | 'schedules' | 'chat' | 'escrow' | 'notaryPayouts' | 'moderation' | 'reports' | 'invitations' | 'audit' | 'identityReviews' | 'settings';
   to: string;
   label: string;
   icon: React.ReactNode;
@@ -61,6 +62,7 @@ const navItems: Array<{
   { key: 'moderation', to: '/moderation', label: 'Moderasi Chat', icon: <ShieldAlert size={18} /> },
   { key: 'reports', to: '/reports/operational', label: 'Laporan', icon: <BarChart3 size={18} /> },
   { key: 'invitations', to: '/invitations', label: 'Undangan Klien', icon: <UserPlus size={18} /> },
+  { key: 'identityReviews', to: '/identity-reviews', label: 'Verifikasi Identitas', icon: <BadgeCheck size={18} /> },
   { key: 'audit', to: '/audit', label: 'Log Audit', icon: <History size={18} /> },
   { key: 'settings', to: '/settings', label: 'Pengaturan', icon: <Settings size={18} /> },
 ];
@@ -412,6 +414,7 @@ function getBreadcrumbText(pathname: string) {
   if (pathname.startsWith('/moderation')) return 'Moderasi';
   if (pathname.startsWith('/audit')) return 'Log Audit';
   if (pathname.startsWith('/invitations')) return 'Undangan Klien';
+  if (pathname.startsWith('/identity-reviews')) return 'Verifikasi Identitas';
   if (pathname.startsWith('/settings')) return 'Pengaturan';
   if (pathname.startsWith('/reports')) return 'Laporan';
   if (pathname.startsWith('/escrow')) return 'Escrow & Payout';

@@ -36,6 +36,8 @@ const NotaryPayouts = lazy(() => import('./views/NotaryPayouts'));
 const ReportsOperational = lazy(() => import('./views/ReportsOperational'));
 const ReportsRepertorium = lazy(() => import('./views/ReportsRepertorium'));
 const Settings = lazy(() => import('./views/Settings'));
+const IdentityReviews = lazy(() => import('./views/IdentityReviews'));
+const IdentityReviewDetail = lazy(() => import('./views/IdentityReviewDetail'));
 
 function logRouteRedirect(reason: string, details?: Record<string, unknown>) {
   console.info('[auth] route-redirect', { reason, ...(details || {}) });
@@ -265,6 +267,18 @@ const settingsRoute = createRoute({
   component: () => <GuardedPage accessKey="settings"><LazyPage><Settings /></LazyPage></GuardedPage>,
 });
 
+const identityReviewsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/identity-reviews',
+  component: () => <GuardedPage accessKey="identityReviews"><LazyPage><IdentityReviews /></LazyPage></GuardedPage>,
+});
+
+const identityReviewDetailRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/identity-reviews/$clientProfileId',
+  component: () => <GuardedPage accessKey="identityReviews"><LazyPage><IdentityReviewDetail /></LazyPage></GuardedPage>,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   totpRoute,
@@ -293,6 +307,8 @@ const routeTree = rootRoute.addChildren([
     reportsRepertoriumRoute,
     auditRoute,
     invitationsRoute,
+    identityReviewsRoute,
+    identityReviewDetailRoute,
     settingsRoute,
   ]),
 ]);

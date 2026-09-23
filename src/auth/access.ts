@@ -15,6 +15,7 @@ export const routeAccess = {
   reports: ['PRINCIPAL', 'SUPER_ADMIN', 'FINANCE_ADMIN'],
   audit: ['PRINCIPAL', 'SUPER_ADMIN'],
   invitations: ['PRINCIPAL', 'SUPER_ADMIN', 'ADMIN_INTAKE', 'ADMIN_OFFICE'],
+  identityReviews: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE'],
   settings: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE', 'ADMIN_INTAKE', 'FINANCE_ADMIN'],
 } satisfies Record<string, AppRole[]>;
 
@@ -37,6 +38,7 @@ export const settingsAccess = {
   staff: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE'],
   notaries: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE', 'ADMIN_INTAKE'],
   rates: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE', 'FINANCE_ADMIN'],
+  documentRequirements: ['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE'],
 } satisfies Record<string, AppRole[]>;
 
 export function hasAnyRole(roles: readonly AppRole[] | null | undefined, allowed: readonly AppRole[]) {

@@ -23,6 +23,14 @@ describe('canAccess', () => {
     expect(canVerifyDocuments(['FINANCE_ADMIN'])).toBe(false);
   });
 
+  it('allows only approved admin roles into identity review', () => {
+    (['SUPER_ADMIN', 'PRINCIPAL', 'ADMIN_OFFICE'] as const).forEach((role) => {
+      expect(canAccess([role], 'identityReviews')).toBe(true);
+    });
+    expect(canAccess(['FINANCE_ADMIN'], 'identityReviews')).toBe(false);
+    expect(canAccess(['ADMIN_INTAKE'], 'identityReviews')).toBe(false);
+  });
+
   it('allows only operational admin roles to create matter timeline events', () => {
     (['ADMIN_INTAKE', 'ADMIN_OFFICE', 'PRINCIPAL', 'SUPER_ADMIN'] as const).forEach((role) => {
       expect(canCreateMatterTimelineEvent([role])).toBe(true);
