@@ -291,7 +291,7 @@
         },
         "responses": {
           "200": {
-            "description": "Membuat user aplikasi, role NOTARY, notary profile pending_approval, dan mengembalikan pending_verification tanpa session notary.",
+            "description": "Membuat user aplikasi, role NOTARY, notary profile pending_approval, dan mengembalikan pending_verification. Session hanya tersedia setelah email terverifikasi dan hanya dapat dipakai untuk onboarding, bukan operasi matter.",
             "content": {
               "application/json": {
                 "schema": {
@@ -323,7 +323,7 @@
         },
         "responses": {
           "200": {
-            "description": "User existing langsung login. User baru wajib mengirim workspace; workspace NOTARY tetap membuat profil pending_approval tanpa session notary.",
+            "description": "User existing langsung login. User baru wajib mengirim workspace; workspace NOTARY tetap membuat profil pending_approval dengan akses terbatas untuk onboarding.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1283,7 +1283,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatterListResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1319,7 +1326,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceCategoryListResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1328,6 +1342,170 @@
           }
         ],
         "summary": "List service categories (optionally filter by tenant)",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/service-categories/{serviceCategoryId}/document-requirements": {
+      "get": {
+        "operationId": "MatterController_listCategoryDocumentRequirements",
+        "parameters": [
+          {
+            "name": "serviceCategoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serviceVariantId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatterDocumentRequirementDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List active document requirements for a service category",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/document-requirements": {
+      "get": {
+        "operationId": "MatterController_listMatterDocumentRequirements",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatterDocumentRequirementsSnapshotResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List immutable document requirement snapshot for a matter",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
+        ]
+      }
+    },
+    "/api/v1/matters/{matterId}/requirements": {
+      "get": {
+        "operationId": "MatterController_listMatterRequirements",
+        "parameters": [
+          {
+            "name": "matterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatterDocumentRequirementsSnapshotResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Canonical immutable requirement checklist for a matter",
         "tags": [
           "matters"
         ],
@@ -1526,6 +1704,73 @@
           "MODERATION_OFFICER",
           "NOTARY",
           "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/service-categories/{serviceCategoryId}/document-requirements": {
+      "get": {
+        "description": "The active category catalogue must not be used for an existing matter; use its immutable snapshot endpoint instead.",
+        "operationId": "DocumentRequirementController_list",
+        "parameters": [
+          {
+            "name": "serviceCategoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serviceVariantId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatterDocumentRequirementDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List active document requirements for future matters in a service category",
+        "tags": [
+          "matters"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2686,6 +2931,14 @@
         "summary": "List step BPN matter beserta SLA aging",
         "tags": [
           "bpn"
+        ],
+        "x-roles": [
+          "CLIENT",
+          "NOTARY",
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE",
+          "PRINCIPAL",
+          "SUPER_ADMIN"
         ]
       }
     },
@@ -2715,6 +2968,10 @@
         "summary": "Trigger sinkronisasi status BPN manual/semi-otomatis",
         "tags": [
           "bpn"
+        ],
+        "x-roles": [
+          "ADMIN_INTAKE",
+          "ADMIN_OFFICE"
         ]
       }
     },
@@ -3721,6 +3978,1041 @@
         ]
       }
     },
+    "/api/v1/admin/service-categories/{serviceCategoryId}/document-requirements": {
+      "get": {
+        "description": "The active catalogue applies only to matters created after the configuration. Existing matters use immutable requirement snapshots.",
+        "operationId": "AdminController_listDocumentRequirements",
+        "parameters": [
+          {
+            "name": "serviceCategoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentRequirementCatalogueResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List configurable document requirements for a service category",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      },
+      "patch": {
+        "description": "Use PUT as the canonical full-replacement operation. Existing matter snapshots are never changed.",
+        "operationId": "AdminController_replaceDocumentRequirements",
+        "parameters": [
+          {
+            "name": "serviceCategoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceDocumentRequirementsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentRequirementCatalogueResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Compatibility alias for replacing active document requirements for future matters",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      },
+      "put": {
+        "description": "Canonical full replacement. Existing matters continue to use their immutable snapshots.",
+        "operationId": "AdminController_replaceDocumentRequirementsCanonical",
+        "parameters": [
+          {
+            "name": "serviceCategoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceDocumentRequirementsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentRequirementCatalogueResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Replace active document requirements for future matters",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/admin/service-categories/{serviceCategoryId}/document-requirements/{requirementId}": {
+      "patch": {
+        "description": "The request body is the full requirement object. Existing matter snapshots are never changed.",
+        "operationId": "AdminController_patchDocumentRequirement",
+        "parameters": [
+          {
+            "name": "serviceCategoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requirementId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentRequirementInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentRequirementCatalogueResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Replace one active document requirement for future matters",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/notaries/me": {
+      "get": {
+        "description": "Owner-only read model. Koordinat kantor hanya dikembalikan kepada notaris terautentikasi pemilik profil.",
+        "operationId": "NotaryController_getSelf",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotarySelfProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Profil lengkap notaris yang sedang login",
+        "tags": [
+          "notaries"
+        ],
+        "x-roles": [
+          "NOTARY"
+        ]
+      },
+      "patch": {
+        "description": "Hanya fullName, phone, dan alamat kantor. Status, availability, coverage, legal eligibility, role, tenant, user, dan koordinat tidak dapat diubah melalui endpoint ini.",
+        "operationId": "NotaryController_updateSelf",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotaryProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotarySelfProfileDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update field aman profil notaris yang sedang login",
+        "tags": [
+          "notaries"
+        ],
+        "x-roles": [
+          "NOTARY"
+        ]
+      }
+    },
+    "/api/v1/notaries/me/verification-documents/presign": {
+      "post": {
+        "operationId": "NotaryController_presignVerificationDocument",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignNotaryVerificationDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignNotaryVerificationDocumentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Generate private upload URL untuk dokumen verifikasi notaris",
+        "tags": [
+          "notaries"
+        ],
+        "x-roles": [
+          "NOTARY"
+        ]
+      }
+    },
+    "/api/v1/notaries/me/verification-documents/complete": {
+      "post": {
+        "operationId": "NotaryController_completeVerificationDocument",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteNotaryVerificationDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompleteNotaryVerificationDocumentResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Complete upload dokumen verifikasi notaris setelah object exists",
+        "tags": [
+          "notaries"
+        ],
+        "x-roles": [
+          "NOTARY"
+        ]
+      }
+    },
+    "/api/v1/clients/me/identity-verification": {
+      "get": {
+        "operationId": "ClientIdentityController_getMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientIdentityVerificationResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Read the current client profile and identity verification state",
+        "tags": [
+          "clients"
+        ],
+        "x-roles": [
+          "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/clients/me/profile": {
+      "patch": {
+        "operationId": "ClientIdentityController_updateMine",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyClientProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientIdentityVerificationResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update profile information used for client onboarding",
+        "tags": [
+          "clients"
+        ],
+        "x-roles": [
+          "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/clients/me/identity-documents/presign": {
+      "post": {
+        "operationId": "ClientIdentityController_presignMine",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignIdentityDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityDocumentPresignResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create private presigned PUT upload for an identity document",
+        "tags": [
+          "clients"
+        ],
+        "x-roles": [
+          "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/clients/me/identity-documents/complete": {
+      "post": {
+        "operationId": "ClientIdentityController_completeMine",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteIdentityDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityDocumentCompleteResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Complete identity upload and automatically submit it for review",
+        "tags": [
+          "clients"
+        ],
+        "x-roles": [
+          "CLIENT"
+        ]
+      }
+    },
+    "/api/v1/admin/client-identity-verifications": {
+      "get": {
+        "operationId": "AdminClientIdentityController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Optional filter. Omit to return every identity status.",
+            "schema": {
+              "enum": [
+                "unverified",
+                "pending_review",
+                "verified",
+                "needs_revision",
+                "rejected"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientIdentityReviewListResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List tenant-scoped client identity reviews",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/admin/client-identity-verifications/{clientProfileId}": {
+      "get": {
+        "operationId": "AdminClientIdentityController_get",
+        "parameters": [
+          {
+            "name": "clientProfileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientIdentityReviewDetailResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Read client identity review detail",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/admin/client-identity-verifications/{clientProfileId}/approve": {
+      "post": {
+        "operationId": "AdminClientIdentityController_approve",
+        "parameters": [
+          {
+            "name": "clientProfileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientIdentityReviewDetailResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Approve a client identity document",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/admin/client-identity-verifications/{clientProfileId}/request-revision": {
+      "post": {
+        "operationId": "AdminClientIdentityController_revise",
+        "parameters": [
+          {
+            "name": "clientProfileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientIdentityReviewDetailResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Request a replacement identity document",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/admin/client-identity-verifications/{clientProfileId}/reject": {
+      "post": {
+        "operationId": "AdminClientIdentityController_reject",
+        "parameters": [
+          {
+            "name": "clientProfileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientIdentityReviewDetailResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Reject a client identity document",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-documents/{documentId}/download-url": {
+      "get": {
+        "operationId": "AdminIdentityDocumentController_downloadUrl",
+        "parameters": [
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityDocumentDownloadUrlResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Issue an audited private download URL for an identity document",
+        "tags": [
+          "admin"
+        ],
+        "x-roles": [
+          "SUPER_ADMIN",
+          "PRINCIPAL",
+          "ADMIN_OFFICE"
+        ]
+      }
+    },
     "/api/v1": {
       "get": {
         "operationId": "AppController_getHello",
@@ -3828,7 +5120,12 @@
       "description": "Health check"
     }
   ],
-  "servers": [],
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development"
+    }
+  ],
   "components": {
     "securitySchemes": {
       "access-token": {
@@ -3971,6 +5268,21 @@
           "email": {
             "type": "string"
           },
+          "profileId": {
+            "type": "string",
+            "description": "UUID notary_profiles.id milik user."
+          },
+          "session": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FrontendSessionDto"
+              }
+            ]
+          },
+          "requiresEmailVerification": {
+            "type": "boolean"
+          },
           "message": {
             "type": "string",
             "example": "Pendaftaran notaris sedang menunggu verifikasi."
@@ -3980,6 +5292,9 @@
           "status",
           "role",
           "email",
+          "profileId",
+          "session",
+          "requiresEmailVerification",
           "message"
         ]
       },
@@ -4003,6 +5318,41 @@
         "required": [
           "email",
           "password"
+        ]
+      },
+      "ClientCapabilitiesDto": {
+        "type": "object",
+        "properties": {
+          "canViewMatters": {
+            "type": "boolean"
+          },
+          "canCreateMatter": {
+            "type": "boolean"
+          },
+          "canUploadMatterDocuments": {
+            "type": "boolean"
+          },
+          "canViewPayments": {
+            "type": "boolean"
+          },
+          "canPayMatter": {
+            "type": "boolean"
+          },
+          "canChatOnMatters": {
+            "type": "boolean"
+          },
+          "canViewMatterSchedule": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canViewMatters",
+          "canCreateMatter",
+          "canUploadMatterDocuments",
+          "canViewPayments",
+          "canPayMatter",
+          "canChatOnMatters",
+          "canViewMatterSchedule"
         ]
       },
       "AuthUserDto": {
@@ -4043,6 +5393,26 @@
           "lastLoginAt": {
             "type": "object",
             "nullable": true
+          },
+          "profileCompletionStatus": {
+            "type": "string",
+            "enum": [
+              "incomplete",
+              "complete"
+            ]
+          },
+          "identityVerificationStatus": {
+            "type": "string",
+            "enum": [
+              "unverified",
+              "pending_review",
+              "verified",
+              "needs_revision",
+              "rejected"
+            ]
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/ClientCapabilitiesDto"
           }
         },
         "required": [
@@ -4076,6 +5446,9 @@
           },
           "user": {
             "$ref": "#/components/schemas/AuthUserDto"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/ClientCapabilitiesDto"
           }
         },
         "required": [
@@ -4825,6 +6198,11 @@
           "serviceCategoryId": {
             "type": "string"
           },
+          "serviceVariantId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional sub-service/variant. Required when the selected service category has no category-level requirements."
+          },
           "title": {
             "type": "string",
             "example": "AJB Rumah Jl. Sudirman No. 10"
@@ -4856,80 +6234,631 @@
           "id": {
             "type": "string"
           },
-          "tenant_id": {
+          "tenantId": {
             "type": "string"
           },
-          "office_id": {
+          "officeId": {
             "type": "string"
           },
-          "client_profile_id": {
+          "clientProfileId": {
             "type": "string"
           },
-          "service_category_id": {
+          "serviceCategoryId": {
             "type": "string"
           },
-          "matter_number": {
+          "serviceVariantId": {
+            "type": "object",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "matterNumber": {
             "type": "object",
             "nullable": true
           },
           "title": {
             "type": "string"
           },
-          "land_city_code": {
+          "landCityCode": {
             "type": "object",
             "nullable": true
           },
-          "land_province_code": {
+          "landProvinceCode": {
             "type": "object",
             "nullable": true
           },
-          "land_certificate_number": {
+          "landCertificateNumber": {
             "type": "object",
             "nullable": true
           },
-          "transaction_value": {
+          "transactionValue": {
             "type": "object"
           },
-          "workflow_status": {
+          "workflowStatus": {
             "type": "string"
           },
-          "assignment_status": {
+          "assignmentStatus": {
             "type": "string"
           },
-          "payment_status": {
+          "assignedNotaryProfileId": {
+            "type": "object",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "paymentStatus": {
             "type": "string"
           },
-          "bpn_validation_status": {
+          "bpnValidationStatus": {
             "type": "string"
           },
-          "signing_status": {
+          "signingStatus": {
             "type": "string"
           },
-          "created_by": {
+          "createdBy": {
             "type": "string"
           },
-          "created_at": {
+          "createdAt": {
             "type": "string"
           },
-          "updated_at": {
+          "updatedAt": {
             "type": "string"
           }
         },
         "required": [
           "id",
-          "tenant_id",
-          "office_id",
-          "client_profile_id",
-          "service_category_id",
+          "tenantId",
+          "officeId",
+          "clientProfileId",
+          "serviceCategoryId",
           "title",
-          "workflow_status",
-          "assignment_status",
-          "payment_status",
-          "bpn_validation_status",
-          "signing_status",
-          "created_by",
-          "created_at",
-          "updated_at"
+          "workflowStatus",
+          "assignmentStatus",
+          "paymentStatus",
+          "bpnValidationStatus",
+          "signingStatus",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MatterCapabilitiesDto": {
+        "type": "object",
+        "properties": {
+          "canAcceptAssignment": {
+            "type": "boolean"
+          },
+          "canDeclineAssignment": {
+            "type": "boolean"
+          },
+          "canAccessDocuments": {
+            "type": "boolean"
+          },
+          "canViewPayments": {
+            "type": "boolean"
+          },
+          "canChat": {
+            "type": "boolean"
+          },
+          "canViewSchedule": {
+            "type": "boolean"
+          },
+          "canManageSchedule": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canAcceptAssignment",
+          "canDeclineAssignment",
+          "canAccessDocuments",
+          "canViewPayments",
+          "canChat",
+          "canViewSchedule",
+          "canManageSchedule"
+        ]
+      },
+      "MatterListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "officeId": {
+            "type": "string"
+          },
+          "clientProfileId": {
+            "type": "string"
+          },
+          "serviceCategoryId": {
+            "type": "string"
+          },
+          "serviceVariantId": {
+            "type": "object",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "matterNumber": {
+            "type": "object",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "landCityCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "landProvinceCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "landCertificateNumber": {
+            "type": "object",
+            "nullable": true
+          },
+          "transactionValue": {
+            "type": "object"
+          },
+          "workflowStatus": {
+            "type": "string"
+          },
+          "assignmentStatus": {
+            "type": "string"
+          },
+          "assignedNotaryProfileId": {
+            "type": "object",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "paymentStatus": {
+            "type": "string"
+          },
+          "bpnValidationStatus": {
+            "type": "string"
+          },
+          "signingStatus": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/MatterCapabilitiesDto"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "officeId",
+          "clientProfileId",
+          "serviceCategoryId",
+          "title",
+          "workflowStatus",
+          "assignmentStatus",
+          "paymentStatus",
+          "bpnValidationStatus",
+          "signingStatus",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MatterListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatterListItemDto"
+            }
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "meta": {
+            "type": "object",
+            "example": {
+              "total": 1,
+              "page": 1,
+              "limit": 20,
+              "perPage": 20
+            }
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "meta"
+        ]
+      },
+      "ServiceCategoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "AJB-OKE"
+          },
+          "name": {
+            "type": "string",
+            "example": "AJB - Oke"
+          },
+          "description": {
+            "type": "string",
+            "example": "Balik nama sertipikat tanah"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "requiresBpn": {
+            "type": "boolean"
+          },
+          "requiresNotaryAssignment": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requirementSummary": {
+            "type": "object",
+            "example": {
+              "total": 12,
+              "required": 8,
+              "conditional": 4,
+              "digitalUploads": 10
+            }
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "description",
+          "isActive",
+          "requiresBpn",
+          "requiresNotaryAssignment",
+          "createdAt",
+          "updatedAt",
+          "requirementSummary",
+          "variants"
+        ]
+      },
+      "ServiceCategoryListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceCategoryDto"
+            }
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "meta": {
+            "type": "object",
+            "example": {
+              "total": 8
+            }
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "meta"
+        ]
+      },
+      "MatterRequirementDocumentDto": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string"
+          },
+          "verificationStatus": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "object",
+            "nullable": true
+          },
+          "uploadedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "verifiedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "documentId",
+          "verificationStatus"
+        ]
+      },
+      "MatterDocumentRequirementDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "requirementKey": {
+            "type": "string"
+          },
+          "requirementInstanceKey": {
+            "type": "object",
+            "nullable": true
+          },
+          "documentSlotKey": {
+            "type": "string"
+          },
+          "documentType": {
+            "type": "string"
+          },
+          "partyRole": {
+            "type": "object",
+            "nullable": true
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "requirementType": {
+            "type": "string",
+            "enum": [
+              "document",
+              "data_field",
+              "physical_original",
+              "physical_item",
+              "instruction",
+              "output_document"
+            ]
+          },
+          "requirementLevel": {
+            "type": "string",
+            "enum": [
+              "required",
+              "conditional",
+              "optional"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "nullable": true
+          },
+          "isRepeatable": {
+            "type": "boolean"
+          },
+          "minCount": {
+            "type": "number"
+          },
+          "maxCount": {
+            "type": "object",
+            "nullable": true
+          },
+          "digitalUploadRequired": {
+            "type": "boolean"
+          },
+          "physicalOriginalRequired": {
+            "type": "boolean"
+          },
+          "physicalItemRequired": {
+            "type": "boolean"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "input",
+              "output"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_applicable",
+              "missing",
+              "pending_upload",
+              "uploaded",
+              "under_review",
+              "verified",
+              "needs_revision",
+              "rejected",
+              "satisfied"
+            ]
+          },
+          "recommendedFormat": {
+            "type": "object",
+            "nullable": true
+          },
+          "acceptedMimeTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowCamera": {
+            "type": "boolean"
+          },
+          "allowGallery": {
+            "type": "boolean"
+          },
+          "maxFileSizeBytes": {
+            "type": "number"
+          },
+          "multiPageSupported": {
+            "type": "boolean"
+          },
+          "displayOrder": {
+            "type": "number"
+          },
+          "requirementVersion": {
+            "type": "number"
+          },
+          "document": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatterRequirementDocumentDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "requirementKey",
+          "documentSlotKey",
+          "documentType",
+          "label",
+          "required",
+          "requirementType",
+          "requirementLevel",
+          "isRepeatable",
+          "minCount",
+          "digitalUploadRequired",
+          "physicalOriginalRequired",
+          "physicalItemRequired",
+          "direction",
+          "status",
+          "acceptedMimeTypes",
+          "allowCamera",
+          "allowGallery",
+          "maxFileSizeBytes",
+          "multiPageSupported",
+          "displayOrder",
+          "requirementVersion"
+        ]
+      },
+      "MatterDocumentRequirementsSnapshotResponseDto": {
+        "type": "object",
+        "properties": {
+          "matterId": {
+            "type": "string"
+          },
+          "serviceCategoryId": {
+            "type": "object",
+            "nullable": true
+          },
+          "requirementVersion": {
+            "type": "number",
+            "minimum": 0
+          },
+          "requirementsConfigured": {
+            "type": "boolean"
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatterDocumentRequirementDto"
+            }
+          }
+        },
+        "required": [
+          "matterId",
+          "requirementVersion",
+          "requirementsConfigured",
+          "requirements"
+        ]
+      },
+      "ApiErrorDetailsDto": {
+        "type": "object",
+        "properties": {
+          "correlationId": {
+            "type": "string",
+            "example": "req_abc123"
+          },
+          "nextAction": {
+            "type": "string",
+            "enum": [
+              "complete_profile",
+              "upload_identity_document",
+              "wait_for_review",
+              "contact_support"
+            ]
+          }
+        },
+        "required": [
+          "correlationId"
+        ]
+      },
+      "ApiErrorBodyDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "PROFILE_INCOMPLETE",
+              "IDENTITY_VERIFICATION_REQUIRED",
+              "IDENTITY_VERIFICATION_PENDING",
+              "IDENTITY_VERIFICATION_REJECTED",
+              "IDENTITY_DOCUMENT_REQUIRED",
+              "IDENTITY_VERIFICATION_ALREADY_DECIDED",
+              "IDENTITY_VERIFICATION_NOT_FOUND",
+              "DOCUMENT_REQUIREMENTS_NOT_CONFIGURED",
+              "DOCUMENT_REQUIREMENT_VALIDATION_FAILED",
+              "FORBIDDEN"
+            ],
+            "example": "IDENTITY_VERIFICATION_PENDING"
+          },
+          "message": {
+            "type": "string",
+            "example": "Verifikasi identitas sedang menunggu review."
+          },
+          "details": {
+            "$ref": "#/components/schemas/ApiErrorDetailsDto"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details"
+        ]
+      },
+      "ApiErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "error": {
+            "$ref": "#/components/schemas/ApiErrorBodyDto"
+          }
+        },
+        "required": [
+          "data",
+          "error"
         ]
       },
       "MatterTimelineDto": {
@@ -5114,6 +7043,11 @@
           "serviceCategoryId": {
             "type": "string"
           },
+          "serviceVariantId": {
+            "type": "object",
+            "nullable": true,
+            "format": "uuid"
+          },
           "matterNumber": {
             "type": "object",
             "nullable": true
@@ -5168,6 +7102,9 @@
           },
           "updatedAt": {
             "type": "string"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/MatterCapabilitiesDto"
           },
           "serviceCategory": {
             "type": "object",
@@ -5285,6 +7222,16 @@
       "PresignDocumentDto": {
         "type": "object",
         "properties": {
+          "matterRequirementId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Matter requirement snapshot ID. Required for requirement-controlled uploads; legacy docType uploads remain supported only for matters without a snapshot."
+          },
+          "requirementInstanceKey": {
+            "type": "string",
+            "example": "heir:01",
+            "description": "Required for repeatable requirement slots, for example heir:01 or pbb:2025."
+          },
           "docType": {
             "type": "string",
             "enum": [
@@ -6472,6 +8419,1186 @@
         },
         "required": [
           "notaryProfileId"
+        ]
+      },
+      "DocumentRequirementResponseDto": {
+        "type": "object",
+        "properties": {
+          "documentSlotKey": {
+            "type": "string",
+            "example": "ktp:seller",
+            "description": "Stable canonical slot key, unique within one replacement request."
+          },
+          "documentType": {
+            "type": "string",
+            "example": "ktp",
+            "description": "Business-approved canonical document type. This remains a string because the catalogue is dynamic and has no approved global type matrix yet."
+          },
+          "partyRole": {
+            "type": "string",
+            "example": "seller"
+          },
+          "label": {
+            "type": "string",
+            "example": "KTP Penjual"
+          },
+          "description": {
+            "type": "string",
+            "example": "KTP elektronik penjual yang masih berlaku."
+          },
+          "required": {
+            "type": "boolean",
+            "example": true
+          },
+          "recommendedFormat": {
+            "type": "string",
+            "example": "PDF atau JPG"
+          },
+          "acceptedMimeTypes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "enum": [
+                "image/jpeg",
+                "image/png",
+                "application/pdf"
+              ]
+            }
+          },
+          "allowCamera": {
+            "type": "boolean",
+            "example": true
+          },
+          "allowGallery": {
+            "type": "boolean",
+            "example": true
+          },
+          "maxFileSizeBytes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10485760,
+            "example": 10485760
+          },
+          "multiPageSupported": {
+            "type": "boolean",
+            "example": false
+          },
+          "displayOrder": {
+            "type": "number",
+            "minimum": 1,
+            "example": 1
+          },
+          "id": {
+            "type": "string"
+          },
+          "serviceCategoryId": {
+            "type": "object",
+            "nullable": true
+          },
+          "requirementVersion": {
+            "type": "number",
+            "minimum": 1
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "documentSlotKey",
+          "documentType",
+          "label",
+          "required",
+          "acceptedMimeTypes",
+          "allowCamera",
+          "allowGallery",
+          "maxFileSizeBytes",
+          "multiPageSupported",
+          "displayOrder",
+          "id",
+          "requirementVersion",
+          "isActive"
+        ]
+      },
+      "DocumentRequirementCatalogueResponseDto": {
+        "type": "object",
+        "properties": {
+          "serviceCategoryId": {
+            "type": "string"
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentRequirementResponseDto"
+            }
+          }
+        },
+        "required": [
+          "serviceCategoryId",
+          "requirements"
+        ]
+      },
+      "DocumentRequirementInputDto": {
+        "type": "object",
+        "properties": {
+          "documentSlotKey": {
+            "type": "string",
+            "example": "ktp:seller",
+            "description": "Stable canonical slot key, unique within one replacement request."
+          },
+          "documentType": {
+            "type": "string",
+            "example": "ktp",
+            "description": "Business-approved canonical document type. This remains a string because the catalogue is dynamic and has no approved global type matrix yet."
+          },
+          "partyRole": {
+            "type": "string",
+            "example": "seller"
+          },
+          "label": {
+            "type": "string",
+            "example": "KTP Penjual"
+          },
+          "description": {
+            "type": "string",
+            "example": "KTP elektronik penjual yang masih berlaku."
+          },
+          "required": {
+            "type": "boolean",
+            "example": true
+          },
+          "recommendedFormat": {
+            "type": "string",
+            "example": "PDF atau JPG"
+          },
+          "acceptedMimeTypes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "enum": [
+                "image/jpeg",
+                "image/png",
+                "application/pdf"
+              ]
+            }
+          },
+          "allowCamera": {
+            "type": "boolean",
+            "example": true
+          },
+          "allowGallery": {
+            "type": "boolean",
+            "example": true
+          },
+          "maxFileSizeBytes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10485760,
+            "example": 10485760
+          },
+          "multiPageSupported": {
+            "type": "boolean",
+            "example": false
+          },
+          "displayOrder": {
+            "type": "number",
+            "minimum": 1,
+            "example": 1
+          }
+        },
+        "required": [
+          "documentSlotKey",
+          "documentType",
+          "label",
+          "required",
+          "acceptedMimeTypes",
+          "allowCamera",
+          "allowGallery",
+          "maxFileSizeBytes",
+          "multiPageSupported",
+          "displayOrder"
+        ]
+      },
+      "ReplaceDocumentRequirementsDto": {
+        "type": "object",
+        "properties": {
+          "requirements": {
+            "minItems": 0,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentRequirementInputDto"
+            }
+          }
+        },
+        "required": [
+          "requirements"
+        ]
+      },
+      "NotaryProfileStatus": {
+        "type": "string",
+        "enum": [
+          "pending_approval",
+          "approved",
+          "rejected",
+          "inactive",
+          "suspended"
+        ]
+      },
+      "NotaryVerificationDocumentMetadataDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "object",
+            "nullable": true
+          },
+          "mimeType": {
+            "type": "object",
+            "nullable": true
+          },
+          "uploadedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "NotarySelfProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "object",
+            "nullable": true
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotaryProfileStatus"
+              }
+            ]
+          },
+          "licenseNumber": {
+            "type": "object",
+            "nullable": true
+          },
+          "licenseDate": {
+            "type": "object",
+            "nullable": true,
+            "format": "date"
+          },
+          "jurisdictionCity": {
+            "type": "object",
+            "nullable": true
+          },
+          "officeAddress": {
+            "type": "object",
+            "nullable": true
+          },
+          "officeCity": {
+            "type": "object",
+            "nullable": true
+          },
+          "officeProvince": {
+            "type": "object",
+            "nullable": true
+          },
+          "officePostalCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "officeLatitude": {
+            "type": "object",
+            "nullable": true
+          },
+          "officeLongitude": {
+            "type": "object",
+            "nullable": true
+          },
+          "locationUpdatedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "acceptsNewAssignment": {
+            "type": "boolean"
+          },
+          "coverageAreas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotaryCoverageAreaDto"
+            }
+          },
+          "verificationDocuments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotaryVerificationDocumentMetadataDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "status",
+          "acceptsNewAssignment",
+          "coverageAreas",
+          "verificationDocuments"
+        ]
+      },
+      "UpdateNotaryProfileDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "Raka Pratama, SH., M.Kn."
+          },
+          "phone": {
+            "type": "string",
+            "example": "08123456789"
+          },
+          "officeAddress": {
+            "type": "string",
+            "example": "Jl. Notaris No. 1"
+          },
+          "officeCity": {
+            "type": "string",
+            "example": "Jakarta Selatan"
+          },
+          "officeProvince": {
+            "type": "string",
+            "example": "DKI Jakarta"
+          },
+          "officePostalCode": {
+            "type": "string",
+            "example": "12190"
+          }
+        }
+      },
+      "PresignNotaryVerificationDocumentDto": {
+        "type": "object",
+        "properties": {
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "license_certificate",
+              "appointment_decree",
+              "identity_document"
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "example": "sk-notaris.pdf"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "application/pdf"
+            ]
+          },
+          "fileSize": {
+            "type": "number",
+            "maximum": 10485760
+          }
+        },
+        "required": [
+          "documentType",
+          "fileName",
+          "mimeType",
+          "fileSize"
+        ]
+      },
+      "NotaryVerificationUploadDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "PUT"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "expiresIn": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bucket",
+          "key",
+          "method",
+          "url",
+          "token",
+          "expiresIn"
+        ]
+      },
+      "PresignNotaryVerificationDocumentResponseDto": {
+        "type": "object",
+        "properties": {
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "license_certificate",
+              "appointment_decree",
+              "identity_document"
+            ]
+          },
+          "upload": {
+            "$ref": "#/components/schemas/NotaryVerificationUploadDto"
+          }
+        },
+        "required": [
+          "documentType",
+          "upload"
+        ]
+      },
+      "CompleteNotaryVerificationDocumentDto": {
+        "type": "object",
+        "properties": {
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "license_certificate",
+              "appointment_decree",
+              "identity_document"
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "example": "sk-notaris.pdf"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "application/pdf"
+            ]
+          },
+          "fileSize": {
+            "type": "number",
+            "maximum": 10485760
+          },
+          "storageKey": {
+            "type": "string",
+            "description": "Object key returned by the presign endpoint."
+          }
+        },
+        "required": [
+          "documentType",
+          "fileName",
+          "mimeType",
+          "fileSize",
+          "storageKey"
+        ]
+      },
+      "CompleteNotaryVerificationDocumentResponseDto": {
+        "type": "object",
+        "properties": {
+          "documentType": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "fileSize": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "uploaded"
+            ]
+          },
+          "uploadedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "documentType",
+          "fileName",
+          "mimeType",
+          "fileSize",
+          "status",
+          "uploadedAt"
+        ]
+      },
+      "IdentityDocumentResponseDto": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string"
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "ktp"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "application/pdf"
+            ]
+          },
+          "fileSizeBytes": {
+            "type": "number"
+          },
+          "versionNumber": {
+            "type": "number",
+            "minimum": 1
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": [
+              "pending_review",
+              "verified",
+              "needs_revision",
+              "rejected",
+              "superseded"
+            ]
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "verifiedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "revisionNote": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "documentId",
+          "documentType",
+          "fileName",
+          "mimeType",
+          "fileSizeBytes",
+          "versionNumber",
+          "verificationStatus",
+          "uploadedAt"
+        ]
+      },
+      "ClientIdentityVerificationResponseDto": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "object",
+            "nullable": true
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "addressLine": {
+            "type": "object",
+            "nullable": true
+          },
+          "city": {
+            "type": "object",
+            "nullable": true
+          },
+          "province": {
+            "type": "object",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "domicile": {
+            "type": "object",
+            "nullable": true
+          },
+          "profileCompletionStatus": {
+            "type": "string",
+            "enum": [
+              "incomplete",
+              "complete"
+            ]
+          },
+          "identityVerificationStatus": {
+            "type": "string",
+            "enum": [
+              "unverified",
+              "pending_review",
+              "verified",
+              "needs_revision",
+              "rejected"
+            ]
+          },
+          "identityRevisionNote": {
+            "type": "object",
+            "nullable": true
+          },
+          "identityVerifiedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdentityDocumentResponseDto"
+            }
+          }
+        },
+        "required": [
+          "profileId",
+          "profileCompletionStatus",
+          "identityVerificationStatus",
+          "documents"
+        ]
+      },
+      "UpdateMyClientProfileDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "addressLine": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "province": {
+            "type": "string"
+          },
+          "postalCode": {
+            "type": "string"
+          },
+          "domicile": {
+            "type": "string"
+          }
+        }
+      },
+      "PresignIdentityDocumentDto": {
+        "type": "object",
+        "properties": {
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "ktp"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "application/pdf"
+            ]
+          },
+          "fileSize": {
+            "type": "number",
+            "maximum": 10485760
+          }
+        },
+        "required": [
+          "documentType",
+          "fileName",
+          "mimeType",
+          "fileSize"
+        ]
+      },
+      "IdentityDocumentPresignedUploadDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "PUT"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "expiresIn": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bucket",
+          "key",
+          "method",
+          "url",
+          "token",
+          "expiresIn"
+        ]
+      },
+      "IdentityDocumentPresignResponseDto": {
+        "type": "object",
+        "properties": {
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "ktp"
+            ]
+          },
+          "upload": {
+            "$ref": "#/components/schemas/IdentityDocumentPresignedUploadDto"
+          }
+        },
+        "required": [
+          "documentType",
+          "upload"
+        ]
+      },
+      "CompleteIdentityDocumentDto": {
+        "type": "object",
+        "properties": {
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "ktp"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "application/pdf"
+            ]
+          },
+          "fileSize": {
+            "type": "number",
+            "maximum": 10485760
+          },
+          "storageKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "documentType",
+          "fileName",
+          "mimeType",
+          "fileSize",
+          "storageKey"
+        ]
+      },
+      "IdentityDocumentCompleteResponseDto": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string"
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "ktp"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_review"
+            ]
+          },
+          "uploadedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "documentId",
+          "documentType",
+          "status",
+          "uploadedAt"
+        ]
+      },
+      "ClientIdentityReviewSummaryDto": {
+        "type": "object",
+        "properties": {
+          "clientProfileId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "object",
+            "nullable": true
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "profileCompletionStatus": {
+            "type": "string",
+            "enum": [
+              "incomplete",
+              "complete"
+            ]
+          },
+          "identityVerificationStatus": {
+            "type": "string",
+            "enum": [
+              "unverified",
+              "pending_review",
+              "verified",
+              "needs_revision",
+              "rejected"
+            ]
+          },
+          "identityRevisionNote": {
+            "type": "object",
+            "nullable": true
+          },
+          "latestDocument": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IdentityDocumentResponseDto"
+              }
+            ]
+          },
+          "uploadedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "verifiedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "clientProfileId",
+          "userId",
+          "profileCompletionStatus",
+          "identityVerificationStatus"
+        ]
+      },
+      "IdentityReviewPaginationDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total"
+        ]
+      },
+      "ClientIdentityReviewListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientIdentityReviewSummaryDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/IdentityReviewPaginationDto"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "AdminIdentityDocumentResponseDto": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string"
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "ktp"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "application/pdf"
+            ]
+          },
+          "fileSizeBytes": {
+            "type": "number"
+          },
+          "versionNumber": {
+            "type": "number",
+            "minimum": 1
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": [
+              "pending_review",
+              "verified",
+              "needs_revision",
+              "rejected",
+              "superseded"
+            ]
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "verifiedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "revisionNote": {
+            "type": "object",
+            "nullable": true
+          },
+          "downloadEndpoint": {
+            "type": "string",
+            "example": "/api/v1/admin/identity-documents/uuid/download-url"
+          }
+        },
+        "required": [
+          "documentId",
+          "documentType",
+          "fileName",
+          "mimeType",
+          "fileSizeBytes",
+          "versionNumber",
+          "verificationStatus",
+          "uploadedAt",
+          "downloadEndpoint"
+        ]
+      },
+      "ClientIdentityReviewDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "clientProfileId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "object",
+            "nullable": true
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "profileCompletionStatus": {
+            "type": "string",
+            "enum": [
+              "incomplete",
+              "complete"
+            ]
+          },
+          "identityVerificationStatus": {
+            "type": "string",
+            "enum": [
+              "unverified",
+              "pending_review",
+              "verified",
+              "needs_revision",
+              "rejected"
+            ]
+          },
+          "identityRevisionNote": {
+            "type": "object",
+            "nullable": true
+          },
+          "latestDocument": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IdentityDocumentResponseDto"
+              }
+            ]
+          },
+          "uploadedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "verifiedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "addressLine": {
+            "type": "object",
+            "nullable": true
+          },
+          "city": {
+            "type": "object",
+            "nullable": true
+          },
+          "province": {
+            "type": "object",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "domicile": {
+            "type": "object",
+            "nullable": true
+          },
+          "identityVerifiedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "identityVerifiedBy": {
+            "type": "object",
+            "nullable": true
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminIdentityDocumentResponseDto"
+            }
+          }
+        },
+        "required": [
+          "clientProfileId",
+          "userId",
+          "profileCompletionStatus",
+          "identityVerificationStatus",
+          "documents"
+        ]
+      },
+      "IdentityDecisionDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Required for revision and rejection."
+          }
+        }
+      },
+      "IdentityDocumentDownloadUrlResponseDto": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "documentId",
+          "fileName",
+          "method",
+          "url",
+          "expiresIn"
         ]
       }
     }
