@@ -46,5 +46,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   documents: {
     fetchBinary: (url) => ipcRenderer.invoke('documents:fetch-binary', url),
+    print: (opts) => ipcRenderer.invoke('documents:print', opts),
   },
 });

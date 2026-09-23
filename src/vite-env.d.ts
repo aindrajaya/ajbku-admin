@@ -50,6 +50,7 @@ interface Window {
     };
     documents: {
       fetchBinary: (url: string) => Promise<{ success: boolean; buffer?: ArrayBuffer; contentType?: string; error?: string }>;
+      print: (opts: { buffer: ArrayBuffer; mimeType: string; fileName: string }) => Promise<{ success: boolean; error?: string }>;
     };
     shell: {
       openExternal: (url: string) => Promise<void>;

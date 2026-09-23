@@ -817,6 +817,31 @@ function setupIpcHandlers() {
       };
     }
   });
+
+  ipcMain.handle('documents:print', async (_, opts) => {
+    const mimeType = String(opts?.mimeType || '');
+    const fileName = String(opts?.fileName || 'document');
+    if (!['application/pdf', 'image/jpeg', 'image/png'].includes(mimeType)) {
+      return { success: false, error: 'Unsupported document type for printing.' };
+    }
+    const extension = mimeType === 'application/pdf' ? '.pdf' : mimeType === 'image/png' ? '.png' : '.jpg';
+    const tempPath = path.join(app.getPath('temp'), `ajbku-print-${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`);
+    let printWindow = null;
+    try {
+      const rawBuffer = opts?.buffer instanceof ArrayBuffer ? Buffer.from(new Uint8Array(opts.buffer)) : Buffer.from(opts?.buffer || []);
+      if (!rawBuffer.length) throw new Error('Document binary is empty.');
+      fs.writeFileSync(tempPath, rawBuffer, { mode: 0o600 });
+      printWindow = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+      await printWindow.loadFile(tempPath);
+      const result = await new Promise((resolve) => printWindow.webContents.print({ silent: false, printBackground: true }, (success, failureReason) => resolve({ success, error: failureReason })));
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    } finally {
+      if (printWindow && !printWindow.isDestroyed()) printWindow.close();
+      fs.rm(tempPath, { force: true }, () => {});
+    }
+  });
 }
 
 function setupAutoUpdater() {

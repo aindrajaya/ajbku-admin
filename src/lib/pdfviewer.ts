@@ -2,10 +2,15 @@ import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
 
 GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
 
-export async function renderPdfToCanvas(canvas: HTMLCanvasElement, data: Uint8Array, scale: number) {
+export async function getPdfPageCount(data: Uint8Array) {
   const pdf = await getDocument({ data }).promise;
-  const page = await pdf.getPage(1);
-  const viewport = page.getViewport({ scale });
+  return pdf.numPages;
+}
+
+export async function renderPdfToCanvas(canvas: HTMLCanvasElement, data: Uint8Array, scale: number, pageNumber = 1, rotation = 0) {
+  const pdf = await getDocument({ data }).promise;
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale, rotation });
   const context = canvas.getContext('2d');
 
   if (!context) {
