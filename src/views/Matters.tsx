@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { api } from '../api/client';
 import { buildMatterListParams, extractMatterList } from '../lib/matters';
+import { getServiceCategoryName, useServiceCategories } from '../lib/serviceCategories';
 import { FileText, Plus, Filter, Search, RotateCcw } from 'lucide-react';
 
 // Status badge mappings matching PRD Section 4.1
@@ -54,16 +55,18 @@ export default function Matters() {
   const [workflowStatus, setWorkflowStatus] = useState('all');
   const [assignmentStatus, setAssignmentStatus] = useState('all');
   const [paymentStatus, setPaymentStatus] = useState('all');
+  const [serviceCategoryId, setServiceCategoryId] = useState('all');
   const [landCityCode, setLandCityCode] = useState('');
 
   // Fetch matters based on filters
   const { data: matters = [], isLoading, refetch } = useQuery({
-    queryKey: ['matters', { workflowStatus, assignmentStatus, paymentStatus, landCityCode }],
+    queryKey: ['matters', { workflowStatus, assignmentStatus, paymentStatus, serviceCategoryId, landCityCode }],
     queryFn: async () => {
       const res = await api.get('/api/v1/matters', buildMatterListParams({
         workflowStatus: workflowStatus !== 'all' ? workflowStatus : undefined,
         assignmentStatus: assignmentStatus !== 'all' ? assignmentStatus : undefined,
         paymentStatus: paymentStatus !== 'all' ? paymentStatus : undefined,
+        serviceCategoryId: serviceCategoryId !== 'all' ? serviceCategoryId : undefined,
         landCityCode: landCityCode || undefined,
       }));
       return extractMatterList(res.data);
@@ -71,22 +74,14 @@ export default function Matters() {
   });
 
   const safeMatters = Array.isArray(matters) ? matters : [];
+  const { data: categories = [] } = useServiceCategories();
 
   const resetFilters = () => {
     setWorkflowStatus('all');
     setAssignmentStatus('all');
     setPaymentStatus('all');
+    setServiceCategoryId('all');
     setLandCityCode('');
-  };
-
-  const getServiceLabel = (catId: string) => {
-    const services: Record<string, string> = {
-      'cat-1': 'AJB',
-      'cat-2': 'Hibah',
-      'cat-3': 'APHT',
-      'cat-4': 'APHB'
-    };
-    return services[catId] || catId;
   };
 
   return (
@@ -167,6 +162,24 @@ export default function Matters() {
               <option value="all">Semua Pembayaran</option>
               {Object.entries(MATTER_PAYMENT_STATUS).map(([key, value]) => (
                 <option key={key} value={key} style={{ background: 'var(--bg-secondary)' }}>{value.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label" style={{ fontSize: '0.75rem' }}>Kategori Layanan</label>
+            <select
+              className="input-field select-field"
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+              value={serviceCategoryId}
+              onChange={(e) => setServiceCategoryId(e.target.value)}
+              data-testid="service-category-filter"
+            >
+              <option value="all">Semua Layanan</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id} style={{ background: 'var(--bg-secondary)' }}>
+                  {category.name}
+                </option>
               ))}
             </select>
           </div>
@@ -261,7 +274,7 @@ export default function Matters() {
                       {m.title}
                     </td>
                     <td style={{ padding: '1.25rem 1.5rem', color: 'var(--text-secondary)' }}>
-                      {getServiceLabel(m.serviceCategoryId)}
+                      {getServiceCategoryName(m, categories)}
                     </td>
                     <td style={{ padding: '1.25rem 1.5rem' }}>
                       <span className={`badge ${wStatus.className}`}>

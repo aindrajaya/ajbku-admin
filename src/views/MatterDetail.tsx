@@ -8,12 +8,13 @@ import { canCreateMatterTimelineEvent } from '../auth/access';
 import { getAssignmentDocumentIssues } from '../lib/assignmentEligibility';
 import { normalizeBodyText, normalizeChatMessage, normalizeChatThread } from '../lib/communication';
 import type { ChatMessage, ChatThread } from '../lib/communication';
-import { buildVerifyDocumentKey, normalizeVerifyDocType, normalizeVerifyPartyRole } from '../lib/verify';
 import { useRealtimeStore } from '../store/realtime';
 import { notifyError, notifyInfo, notifySuccess } from '../store/ui';
 import { queryKeys } from '../lib/queryKeys';
+import { getServiceCategoryName, useServiceCategories } from '../lib/serviceCategories';
 import { getApiErrorMessage } from '../lib/apiError';
 import { extractMatterActivityRows, normalizeMatterActivities } from '../lib/matterActivity';
+import { type MatterRequirement, type MatterRequirementsSnapshot, requirementInstruction, requirementStatusLabel } from '../lib/matterRequirements';
 import { 
   MATTER_WORKFLOW_STATUS, 
   MATTER_ASSIGNMENT_STATUS, 
@@ -140,6 +141,7 @@ export default function MatterDetail() {
   const actualMatter = (rawMatter && typeof rawMatter === 'object' && 'data' in rawMatter && !('error' in rawMatter))
     ? (rawMatter as any).data
     : rawMatter;
+  const { data: categories = [] } = useServiceCategories();
 
   if (isLoadingMatter || !matter || !actualMatter) {
     return <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-muted)' }}>Memuat berkas perkara...</div>;
@@ -241,7 +243,7 @@ export default function MatterDetail() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
               <div>
                 <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Jenis Layanan</span>
-                <span style={{ fontWeight: 600 }}>{safeMatter.serviceName || safeMatter.serviceCategoryName || '-'}</span>
+                <span style={{ fontWeight: 600 }}>{getServiceCategoryName(safeMatter, categories, '-')}</span>
               </div>
               <div>
                 <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Kantor Notaris</span>
@@ -435,39 +437,25 @@ function TabButton({ active, onClick, icon, label }: TabButtonProps) {
 // ======================== TABS IMPLEMENTATION ========================
 
 // 1. DOCUMENTS TAB
-const VALID_DOC_TYPES = [
-  { value: 'ktp', label: 'KTP' },
-  { value: 'kk', label: 'Kartu Keluarga (KK)' },
-  { value: 'npwp', label: 'NPWP' },
-  { value: 'pbb', label: 'PBB' },
-  { value: 'sertifikat', label: 'Sertifikat Tanah' },
-  { value: 'surat_nikah', label: 'Surat Nikah' },
-  { value: 'surat_cerai', label: 'Surat Cerai' },
-  { value: 'akta_kelahiran', label: 'Akta Kelahiran' },
-  { value: 'akta_draft', label: 'Draft Akta' },
-  { value: 'akta_final', label: 'Akta Final' },
-  { value: 'sk_ahli_waris', label: 'SK Ahli Waris' },
-  { value: 'sppht', label: 'SPPHT' },
-  { value: 'bphtb', label: 'BPHTB' },
-  { value: 'pph', label: 'PPh' },
-  { value: 'lainnya', label: 'Lainnya' },
-];
-
 function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: any[] }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  
-  // Selected document type for upload
-  const [selectedDocType, setSelectedDocType] = useState('ktp');
-
-  // Upload progress state
+  const requirementsQuery = useQuery({
+    queryKey: queryKeys.matterDocumentRequirements(matterId),
+    queryFn: async () => (await api.get<MatterRequirementsSnapshot>(`/api/v1/matters/${matterId}/requirements`)).data,
+  });
+  const [selectedRequirementId, setSelectedRequirementId] = useState('');
+  const [requirementInstanceKey, setRequirementInstanceKey] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
-
-  // In-flight upload filename to display in the UI during upload progress
   const [uploadingFileName, setUploadingFileName] = useState('');
-
+  const requirements = [...(requirementsQuery.data?.requirements || [])].sort((a, b) => a.displayOrder - b.displayOrder);
+  const selectedRequirement = requirements.find((item) => item.id === selectedRequirementId);
+  const uploadableRequirements = requirements.filter((item) => item.requirementType === 'document' && item.digitalUploadRequired && item.requirementLevel !== 'conditional');
   const safeDocuments = Array.isArray(documents) ? documents : [];
-  const normalizeDocType = (value: unknown) => normalizeVerifyDocType(value) || String(value || '').toLowerCase();
+
+  useEffect(() => {
+    if (!selectedRequirementId && uploadableRequirements[0]) setSelectedRequirementId(uploadableRequirements[0].id);
+  }, [selectedRequirementId, uploadableRequirements]);
 
   // Uploader action conforming to 2-step presigned URL uploads
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -478,12 +466,14 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
       setUploadProgress(5);
       setUploadingFileName(file.name);
 
-      // Step 1: Request presign
+      if (!selectedRequirement) throw new Error('Pilih requirement dokumen yang dapat diunggah.');
+      if (selectedRequirement.isRepeatable && !requirementInstanceKey.trim()) throw new Error('Kunci instance wajib diisi untuk requirement berulang.');
       const presignRes = await api.post(`/api/v1/matters/${matterId}/documents/presign`, {
         fileName: file.name,
         mimeType: file.type,
-        docType: selectedDocType,
-        fileSize: file.size
+        fileSize: file.size,
+        matterRequirementId: selectedRequirement.id,
+        ...(selectedRequirement.isRepeatable ? { requirementInstanceKey: requirementInstanceKey.trim() } : {}),
       });
 
       const { documentId, upload } = presignRes.data as {
@@ -504,22 +494,18 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
 
       setUploadProgress(15);
 
-      // Step 2: Actual upload to S3/Supabase storage with progress tracking
-      // Use raw axios to prevent Authorization header insertion (avoid S3/Supabase signature conflict)
       await axios.put(upload.url, file, {
         headers: {
           'Content-Type': file.type
         },
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || file.size));
-          // Map to 15% - 90% progress range
           setUploadProgress(15 + Math.round(percentCompleted * 0.75));
         }
       });
 
       setUploadProgress(92);
 
-      // Step 3: Complete upload in backend database
       await api.post(`/api/v1/matters/${matterId}/documents/${documentId}/complete`, {
         storageKey: upload.key,
         originalFilename: file.name,
@@ -529,8 +515,8 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
       
       setUploadProgress(100);
 
-      // Invalidate matters queries to reload matter details and update document list
       await queryClient.invalidateQueries({ queryKey: ['matters', matterId] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.matterDocumentRequirements(matterId) });
 
       setTimeout(() => {
         setUploadProgress(0);
@@ -547,8 +533,8 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
     }
   };
 
-  const openEmbeddedViewer = (documentKey: string, mode: 'preview' | 'verify') => {
-    localStorage.setItem(`ajbku-verify-target-${matterId}`, documentKey);
+  const openEmbeddedViewer = (requirement: MatterRequirement, mode: 'preview' | 'verify') => {
+    localStorage.setItem(`ajbku-verify-target-${matterId}`, requirement.id);
     localStorage.setItem(`ajbku-verify-mode-${matterId}`, mode);
     notifyInfo('Dokumen dibuka di viewer verifikasi tersemat.', 'Dokumen');
     void navigate({ to: '/matters/$id/verify', params: { id: matterId } });
@@ -557,30 +543,29 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h4 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Berkas Persyaratan Perkara</h4>
+        <div><h4 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Checklist Persyaratan Perkara</h4><p style={{ color: 'var(--text-muted)', fontSize: '.75rem', marginTop: '.25rem' }}>Snapshot immutable matter ini adalah source of truth.</p></div>
         
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          {/* Document Type Dropdown */}
           <select
-            value={selectedDocType}
-            onChange={(e) => setSelectedDocType(e.target.value)}
+            value={selectedRequirementId}
+            onChange={(e) => { setSelectedRequirementId(e.target.value); setRequirementInstanceKey(''); }}
             className="input-field select-field"
             style={{
               padding: '0.4rem 0.8rem',
               fontSize: '0.85rem',
-              width: '180px',
+              width: '240px',
               margin: 0
             }}
             disabled={uploadProgress > 0}
           >
-            {VALID_DOC_TYPES.map(type => (
-              <option key={type.value} value={type.value} style={{ background: 'var(--bg-secondary)' }}>
-                {type.label}
+            <option value="">Pilih requirement upload</option>
+            {uploadableRequirements.map(item => (
+              <option key={item.id} value={item.id} style={{ background: 'var(--bg-secondary)' }}>
+                {item.label}{item.isRepeatable ? ' (berulang)' : ''}
               </option>
             ))}
           </select>
-
-          {/* Upload Button */}
+          {selectedRequirement?.isRepeatable ? <input className="input-field" value={requirementInstanceKey} onChange={(e) => setRequirementInstanceKey(e.target.value)} placeholder="Kunci instance, mis. pbb:2026" style={{ width: 190, margin: 0, fontSize: '.8rem' }} disabled={uploadProgress > 0} /> : null}
           <div style={{ position: 'relative' }}>
             <input 
               type="file" 
@@ -597,7 +582,6 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
         </div>
       </div>
 
-      {/* Progress Bar indicator */}
       {uploadProgress > 0 && (
         <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.4rem' }}>
@@ -610,35 +594,18 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
         </div>
       )}
 
-      {/* Documents list table */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {safeDocuments.length === 0 ? (
+        {requirementsQuery.isLoading ? <div style={{ padding: '2rem', color: 'var(--text-muted)' }}>Memuat checklist requirement...</div> : requirements.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Belum ada berkas pendukung terunggah. Silakan pilih kategori dan unggah dokumen.
+            Snapshot requirement belum tersedia untuk matter ini.
           </div>
         ) : (
-          safeDocuments.map((d: any) => {
-            const rawDocType = d.documentType || d.document_type || d.docType;
-            const verifyDocType = normalizeVerifyDocType(rawDocType);
-            const normalizedDocType = verifyDocType || normalizeDocType(rawDocType);
-            const partyRole = normalizeVerifyPartyRole(d.partyRole || d.party_role || rawDocType);
-            const documentKey = verifyDocType ? buildVerifyDocumentKey(verifyDocType, partyRole) : normalizedDocType;
-            const docTypeLabel = VALID_DOC_TYPES.find(t => t.value === normalizedDocType)?.label || normalizedDocType?.toUpperCase() || 'DOKUMEN';
-            const partyLabel = partyRole === 'seller' ? 'Penjual' : partyRole === 'buyer' ? 'Pembeli' : '';
-            const statusLabels: Record<string, { label: string, className: string }> = {
-              missing: { label: 'BELUM UNGGAH', className: 'badge-gray' },
-              uploaded: { label: 'MENUNGGU VERIFIKASI', className: 'badge-blue' },
-              under_review: { label: 'SEDANG DIREVIEW', className: 'badge-yellow' },
-              revision_required: { label: 'BUTUH REVISI', className: 'badge-red' },
-              verified: { label: 'TERVERIFIKASI', className: 'badge-green' },
-              rejected: { label: 'DITOLAK', className: 'badge-red' }
-            };
-            const currentStatus = statusLabels[d.verificationStatus || 'missing'] || { label: (d.verificationStatus || '').toUpperCase(), className: 'badge-gray' };
-            const docName = `${docTypeLabel}${partyLabel ? ` ${partyLabel}` : ''} - Perkara`;
-            
+          requirements.map((item) => {
+            const statusClass = ['verified', 'satisfied'].includes(item.status) ? 'badge-green' : ['needs_revision', 'rejected'].includes(item.status) ? 'badge-red' : ['uploaded', 'under_review'].includes(item.status) ? 'badge-blue' : 'badge-gray';
+            const documentId = item.document?.documentId;
             return (
               <div 
-                key={d.id} 
+                key={item.id}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -652,21 +619,21 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <FileText size={20} style={{ color: 'var(--color-emerald)' }} />
                   <div>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, display: 'block' }}>{docName}</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, display: 'block' }}>{item.label}</span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      Tipe: {docTypeLabel}{partyLabel ? ` (${partyLabel})` : ''}
+                      {item.requirementType} · {item.requirementLevel}{item.isRepeatable ? ` · ${item.minCount}-${item.maxCount ?? '∞'} kali` : ''}{item.physicalOriginalRequired ? ' · asli fisik wajib' : ''}
                     </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginTop: '.25rem' }}>{requirementInstruction(item)}</span>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span className={`badge ${currentStatus.className}`} style={{ fontSize: '0.65rem' }}>
-                    {currentStatus.label}
+                  <span className={`badge ${statusClass}`} style={{ fontSize: '0.65rem' }}>
+                    {requirementStatusLabel(item.status)}
                   </span>
-                  
-                  {d.verificationStatus !== 'missing' && (
+                  {documentId && (
                     <button 
-                      onClick={() => openEmbeddedViewer(documentKey, 'preview')}
+                      onClick={() => openEmbeddedViewer(item, 'preview')}
                         className="btn btn-secondary" 
                         style={{ padding: '0.35rem 0.6rem' }} 
                         title="Pratinjau Dokumen"
@@ -675,9 +642,9 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
                       </button>
                     )}
 
-                    {d.verificationStatus === 'uploaded' && (
+                    {documentId && ['uploaded', 'under_review'].includes(item.status) && (
                       <button 
-                        onClick={() => openEmbeddedViewer(documentKey, 'verify')}
+                        onClick={() => openEmbeddedViewer(item, 'verify')}
                         className="btn btn-primary" 
                         style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
                       >
@@ -689,6 +656,7 @@ function DocsTab({ matterId, documents = [] }: { matterId: string; documents?: a
             );
           })
         )}
+        {safeDocuments.filter((doc) => String(doc?.documentType || doc?.document_type || doc?.docType || '').toLowerCase() === 'lainnya').map((doc) => <div key={doc.id} style={{ padding: '1rem', border: '1px solid rgba(217,119,6,.4)', borderRadius: 8, color: 'var(--color-gold)', fontSize: '.8rem' }}>Dokumen “lainnya” belum dipetakan ke requirement snapshot. Klasifikasikan secara manual sebelum direview.</div>)}
       </div>
 
     </div>

@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { BarChart3, Calendar, FileSpreadsheet, RotateCcw, TrendingUp } from 'lucide-react';
 import { csvEscape } from '../lib/export';
 import { notifyError, notifySuccess } from '../store/ui';
+import { getServiceCategoryName, useServiceCategories } from '../lib/serviceCategories';
 
 const OPTIONAL_CSV_COLUMNS = [
   { header: 'Notaris', keys: ['notaryName', 'notary_name'] },
@@ -28,21 +29,22 @@ function getActiveOptionalColumns(rows: any[]) {
 
 export default function ReportsOperational() {
   const [period, setPeriod] = useState('2026-06');
-  const [serviceType, setServiceType] = useState('all');
+  const [serviceCategoryId, setServiceCategoryId] = useState('all');
   const [year, month] = period.split('-').map(Number);
   const periodTo = `${period}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
 
   const { data: reportData, isLoading, refetch } = useQuery({
-    queryKey: ['reports-operational', period, serviceType],
+    queryKey: ['reports-operational', period, serviceCategoryId],
     queryFn: async () => {
       const res = await api.get('/api/v1/reports/operational', {
         periodFrom: `${period}-01`,
         periodTo,
-        serviceType: serviceType !== 'all' ? serviceType : undefined
+        serviceCategoryId: serviceCategoryId !== 'all' ? serviceCategoryId : undefined
       });
       return res.data;
     }
   });
+  const { data: categories = [] } = useServiceCategories();
 
   const stats = React.useMemo(() => {
     const rawData = reportData?.data || reportData || [];
@@ -73,7 +75,7 @@ export default function ReportsOperational() {
     // Group service distribution
     const distMap: Record<string, number> = {};
     arr.forEach((m: any) => {
-      const cat = m.serviceName || m.serviceCategoryId || 'Lainnya';
+      const cat = getServiceCategoryName(m, categories, 'Lainnya');
       distMap[cat] = (distMap[cat] || 0) + 1;
     });
 
@@ -93,7 +95,7 @@ export default function ReportsOperational() {
       chartData: weeks,
       serviceDist
     };
-  }, [reportData]);
+  }, [reportData, categories]);
 
   const handleExportCsv = async () => {
     try {
@@ -111,7 +113,7 @@ export default function ReportsOperational() {
       ].join(',') + '\n';
       const rows = arr.map((row: any) => {
         const c1 = row.caseNumber || row.no_perkara || '';
-        const c2 = row.serviceName || row.layanan || '';
+        const c2 = getServiceCategoryName(row, categories, row.layanan || 'Lainnya');
         const c3 = row.clientName || row.klien || '';
         const c4 = row.createdAt ? new Date(row.createdAt).toLocaleDateString('id-ID') : row.tanggal || '';
         const c5 = row.workflowStatus || row.status || '';
@@ -180,19 +182,20 @@ export default function ReportsOperational() {
         <div className="input-group" style={{ marginBottom: 0, flex: 1 }}>
           <label className="input-label" style={{ fontSize: '0.75rem' }}>Jenis Layanan</label>
           <select 
-            value={serviceType} 
-            onChange={(e) => setServiceType(e.target.value)} 
+            value={serviceCategoryId}
+            onChange={(e) => setServiceCategoryId(e.target.value)}
+            data-testid="report-service-category-filter"
             className="input-field select-field" 
             style={{ fontSize: '0.85rem' }}
           >
             <option value="all">Semua Layanan</option>
-            <option value="ajb">AJB (Jual Beli)</option>
-            <option value="hibah">Hibah</option>
-            <option value="apht">APHT</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>{category.name}</option>
+            ))}
           </select>
         </div>
 
-        <button onClick={() => { setPeriod('2026-06'); setServiceType('all'); }} className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>
+        <button onClick={() => { setPeriod('2026-06'); setServiceCategoryId('all'); }} className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>
           <RotateCcw size={14} />
         </button>
       </div>

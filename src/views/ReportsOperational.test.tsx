@@ -137,4 +137,27 @@ describe('ReportsOperational CSV export', () => {
     expect(csv).not.toContain('Notary Payout Amount');
     expect(csv).toContain('"Bima Lestari","paid"');
   });
+
+  it('uses catalogue UUIDs for report filtering and embedded names for historic matters', async () => {
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/api/v1/matters/service-categories') {
+        return Promise.resolve({ data: [{
+          id: 'category-oke', code: 'AJB-OKE', name: 'AJB - Oke', description: 'Balik nama',
+          isActive: true, requiresBpn: true, requiresNotaryAssignment: true, createdAt: '', updatedAt: '',
+        }] });
+      }
+      return Promise.resolve({ data: [{ caseNumber: 'LEG-001', serviceCategory: { name: 'AJB Legacy' } }] });
+    });
+
+    renderScreen();
+    const filter = await screen.findByTestId('report-service-category-filter');
+    await waitFor(() => expect((filter as HTMLSelectElement).options).toHaveLength(2));
+    fireEvent.change(filter, { target: { value: 'category-oke' } });
+    await waitFor(() => expect(apiGetMock).toHaveBeenCalledWith('/api/v1/reports/operational', expect.objectContaining({ serviceCategoryId: 'category-oke' })));
+    await screen.findAllByText('1 berkas');
+
+    fireEvent.click(screen.getByText('Ekspor CSV (Excel)'));
+    await waitFor(() => expect(saveFileMock).toHaveBeenCalled());
+    expect(decodeSavedCsv()).toContain('"LEG-001","AJB Legacy"');
+  });
 });

@@ -2,12 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { ArrowLeft, ZoomIn, ZoomOut, Download, AlertTriangle, FileText, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, FileText, CheckCircle2, XCircle } from 'lucide-react';
 import { notifyError, notifySuccess } from '../store/ui';
-import { renderPdfToCanvas } from '../lib/pdfviewer';
-import { useMatterDocumentViewer } from '../hooks/useMatterDocumentViewer';
 import { useAuth } from '../auth/AuthProvider';
 import { canVerifyDocuments } from '../auth/access';
+import { queryKeys } from '../lib/queryKeys';
+import { type MatterRequirement, type MatterRequirementsSnapshot, requirementInstruction, requirementStatusLabel } from '../lib/matterRequirements';
+import AuthorizedDocumentViewer from '../components/AuthorizedDocumentViewer';
 import {
   buildVerifyDraftKey,
   buildVerifyDocumentKey,
@@ -18,7 +19,6 @@ import {
   normalizeVerifyDocType,
   normalizeVerifyPartyRole,
   validateVerifyForm,
-  verifyDocumentTabs,
   verifyDocFields,
   type VerifyDocumentKey,
   type VerifyDocType,
@@ -29,6 +29,7 @@ type NormalizedMatterDocument = {
   id: string;
   docType: string;
   docKey: VerifyDocumentKey;
+  documentSlotKey?: string;
   partyRole?: VerifyPartyRole;
   status: string;
   fileName: string;
@@ -40,7 +41,6 @@ export default function MatterVerify() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const scopeKey = user?.id || 'anonymous';
   const splitPaneKey = buildVerifySplitKey(scopeKey);
   const [leftWidth, setLeftWidth] = useState<number>(() => Number(localStorage.getItem(splitPaneKey) || 60));
@@ -48,13 +48,11 @@ export default function MatterVerify() {
     const stored = localStorage.getItem(`ajbku-verify-mode-${matterId}`);
     return stored === 'preview' ? 'preview' : 'verify';
   });
-  const [activeTab, setActiveTab] = useState<VerifyDocumentKey>('ktp:seller');
+  const [activeTab, setActiveTab] = useState<string>('ktp:seller');
   const [revisionNote, setRevisionNote] = useState('');
   const [showRevisionDrawer, setShowRevisionDrawer] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [revisionError, setRevisionError] = useState<string | null>(null);
-  const [scale, setScale] = useState(1);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const isResizing = useRef(false);
   const [forms, setForms] = useState<Record<VerifyDocumentKey, Record<string, string>>>(() => createInitialVerifyDocumentForms());
@@ -64,6 +62,11 @@ export default function MatterVerify() {
     queryFn: async () => (await api.get<any>(`/api/v1/matters/${matterId}`)).data,
   });
   const matterPayload = matterQuery.data;
+  const requirementsQuery = useQuery({
+    queryKey: queryKeys.matterDocumentRequirements(matterId),
+    queryFn: async () => (await api.get<MatterRequirementsSnapshot>(`/api/v1/matters/${matterId}/requirements`)).data,
+    retry: false,
+  });
   const matterRecord = useMemo(() => {
     if (matterPayload && typeof matterPayload === 'object' && 'data' in matterPayload && !Array.isArray((matterPayload as any).data)) {
       return (matterPayload as any).data;
@@ -100,6 +103,7 @@ export default function MatterVerify() {
           id: String(doc?.id || ''),
           docType,
           docKey: docType ? buildVerifyDocumentKey(docType, partyRole) : '',
+          documentSlotKey: String(doc?.documentSlotKey || doc?.document_slot_key || doc?.latestVersion?.documentSlotKey || doc?.latestVersion?.document_slot_key || '') || undefined,
           partyRole,
           status: String(doc?.status || doc?.verificationStatus || doc?.verification_status || ''),
           fileName: String(
@@ -115,12 +119,41 @@ export default function MatterVerify() {
       .filter((doc: NormalizedMatterDocument) => doc.id && doc.docType && doc.docKey);
   }, [matterRecord]);
 
-  const orderedTabs = useMemo(() => verifyDocumentTabs, []);
+  const orderedTabs = useMemo(() => {
+    const snapshot = requirementsQuery.data;
+    // Compatibility display only for a legacy matter whose canonical snapshot cannot be read.
+    // New and backfilled matters always render the immutable requirement snapshot above.
+    if (!snapshot?.requirementsConfigured || !snapshot.requirements?.length) {
+      return documents.map((doc, index) => {
+        const key = doc.docKey;
+        const partyRole = doc.partyRole || (['ktp', 'npwp', 'kk'].includes(doc.docType) ? 'seller' : undefined);
+        const roleLabel = partyRole === 'seller' ? ' Penjual' : partyRole === 'buyer' ? ' Pembeli' : '';
+        const requirement: MatterRequirement = {
+          id: doc.id, requirementKey: key, requirementInstanceKey: null, documentSlotKey: key,
+          documentType: doc.docType, partyRole, label: `${doc.docType.toUpperCase()}${roleLabel}`, description: null, required: false,
+          requirementType: 'document' as const, requirementLevel: 'optional' as const, isRepeatable: false, minCount: 0,
+          digitalUploadRequired: true, physicalOriginalRequired: false, physicalItemRequired: false, direction: 'input' as const,
+          status: doc.status, displayOrder: index, maxCount: null, condition: null, document: { documentId: doc.id, verificationStatus: doc.status, fileName: doc.fileName },
+        };
+        return { key, requirement, docType: doc.docType, partyRole, label: requirement.label, status: doc.status, required: false };
+      });
+    }
+    return [...snapshot.requirements]
+      .sort((a, b) => a.displayOrder - b.displayOrder)
+      .map((item) => ({ key: item.id, requirement: item, docType: normalizeVerifyDocType(item.documentType), partyRole: normalizeVerifyPartyRole(item.partyRole), label: item.label, status: item.status, required: item.required }));
+  }, [documents, requirementsQuery.data]);
   const activeTabConfig = orderedTabs.find((tab) => tab.key === activeTab) || orderedTabs[0];
-  const activeDocType = activeTabConfig.docType;
-  const activeDoc = documents.find((doc) => doc.docKey === activeTab);
-  const viewer = useMatterDocumentViewer(matterId, activeDoc || null);
-  const activeDraftKey = buildVerifyDraftKey(matterId, activeTab, scopeKey);
+  const activeRequirement = activeTabConfig?.requirement;
+  const activeDocType = activeTabConfig?.docType || '';
+  const activeDoc = activeRequirement?.document?.documentId ? {
+    id: activeRequirement.document.documentId,
+    docType: activeDocType,
+    docKey: activeTab as VerifyDocumentKey,
+    documentSlotKey: activeRequirement.documentSlotKey,
+    status: activeRequirement.document.verificationStatus || activeRequirement.status,
+    fileName: activeRequirement.document.fileName || '',
+  } : documents.find((doc) => doc.documentSlotKey === activeRequirement?.documentSlotKey);
+  const activeDraftKey = buildVerifyDraftKey(matterId, activeTab as VerifyDocumentKey, scopeKey);
   const verificationSummary = (() => {
     const toStatusMeta = (status: string, isUploaded: boolean) => {
       const normalized = status.toLowerCase();
@@ -138,7 +171,7 @@ export default function MatterVerify() {
     return {
       active: {
         type: activeTab,
-        docLabel: activeTabConfig.label,
+        docLabel: activeTabConfig?.label || activeTab,
         isUploaded: Boolean(activeDoc),
         fileName: activeDoc?.fileName || '',
         statusLabel: activeStatus.label,
@@ -149,42 +182,20 @@ export default function MatterVerify() {
     };
   })();
 
-  const handleDownload = async () => {
-    if (!activeDoc?.fileName || !viewer.documentBytes) {
-      notifyError('Binary dokumen belum siap. Coba beberapa detik lagi.', 'Dokumen');
-      return;
-    }
-
-    try {
-      const result = await window.electronAPI.dialog.saveFile({
-        buffer: viewer.documentBytes.slice().buffer as ArrayBuffer,
-        defaultFilename: activeDoc.fileName,
-        filters: [{ name: 'Documents', extensions: [activeDoc.fileName.split('.').pop() || 'pdf'] }],
-      });
-      if (result.success) {
-        notifySuccess(`Dokumen tersimpan di ${result.filePath}.`, 'Dokumen');
-      } else {
-        notifyError(`Gagal menyimpan dokumen ke filesystem lokal: ${result.error || 'aksi dibatalkan.'}`, 'Dokumen');
-      }
-    } catch (error: any) {
-      notifyError(`Gagal menyimpan dokumen ke filesystem lokal: ${error?.message || 'unknown error'}`, 'Dokumen');
-    }
-  };
-
   useEffect(() => {
     const timer = setInterval(() => {
-      localStorage.setItem(activeDraftKey, JSON.stringify(forms[activeTab]));
+      localStorage.setItem(activeDraftKey, JSON.stringify(forms[activeTab as VerifyDocumentKey] || {}));
     }, 30000);
     return () => clearInterval(timer);
   }, [activeDraftKey, activeDocType, forms]);
 
   useEffect(() => {
     orderedTabs.forEach((tab) => {
-      const stored = localStorage.getItem(buildVerifyDraftKey(matterId, tab.key, scopeKey));
+      const stored = localStorage.getItem(buildVerifyDraftKey(matterId, tab.key as VerifyDocumentKey, scopeKey));
       if (!stored) return;
       try {
         const parsed = JSON.parse(stored);
-        setForms((prev) => ({ ...prev, [tab.key]: { ...prev[tab.key], ...parsed } }));
+        setForms((prev) => ({ ...prev, [tab.key as VerifyDocumentKey]: { ...(prev[tab.key as VerifyDocumentKey] || {}), ...parsed } }));
       } catch {
         // Ignore corrupted draft payloads.
       }
@@ -192,53 +203,29 @@ export default function MatterVerify() {
   }, [matterId, orderedTabs, scopeKey]);
 
   useEffect(() => {
-    const preferredTab = normalizeVerifyDocumentKey(localStorage.getItem(`ajbku-verify-target-${matterId}`));
+    const preferredTab = localStorage.getItem(`ajbku-verify-target-${matterId}`);
     const preferredMode = localStorage.getItem(`ajbku-verify-mode-${matterId}`);
     setViewerMode(preferredMode === 'preview' ? 'preview' : 'verify');
-    if (preferredTab && orderedTabs.some((tab) => tab.key === preferredTab)) {
-      setActiveTab(preferredTab);
+    const normalizedPreferredTab = normalizeVerifyDocumentKey(preferredTab);
+    const preferredRequirement = preferredTab && orderedTabs.find((tab) => tab.key === preferredTab || tab.requirement.documentSlotKey === preferredTab || tab.key === normalizedPreferredTab);
+    if (preferredRequirement) {
+      setActiveTab(preferredRequirement.key);
       localStorage.removeItem(`ajbku-verify-target-${matterId}`);
       return;
     }
 
-    if (documents.length > 0 && !documents.some((doc) => doc.docKey === activeTab)) {
-      const firstUploaded = orderedTabs.find((tab) => documents.some((doc) => doc.docKey === tab.key));
+    if (orderedTabs.length && !orderedTabs.some((tab) => tab.key === activeTab)) {
+      const firstUploaded = orderedTabs.find((tab) => tab.requirement.document?.documentId);
       if (firstUploaded?.key) {
         setActiveTab(firstUploaded.key);
+      } else {
+        setActiveTab(orderedTabs[0].key);
       }
     }
   }, [activeTab, documents, matterId, orderedTabs]);
 
   const isPreviewOnly = viewerMode === 'preview';
   const canSubmitVerification = canVerifyDocuments(user?.roles);
-
-  useEffect(() => {
-    if (!viewer.documentBytes || !viewer.isPdf || !canvasRef.current) {
-      return;
-    }
-
-    let cancelled = false;
-    setPdfError(null);
-
-    void (async () => {
-      try {
-        const canvas = canvasRef.current;
-        const bytes = viewer.documentBytes;
-        if (!canvas || !bytes) return;
-        const context = canvas.getContext('2d');
-        context?.clearRect(0, 0, canvas.width, canvas.height);
-        await renderPdfToCanvas(canvas, bytes.slice(), Math.max(0.6, scale));
-      } catch {
-        if (!cancelled) {
-          setPdfError(viewer.error || 'PDF gagal dirender. Gunakan tautan unduh aman untuk membuka dokumen.');
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [scale, viewer.documentBytes, viewer.error, viewer.isPdf]);
 
   const handleMouseDown = () => {
     isResizing.current = true;
@@ -259,8 +246,10 @@ export default function MatterVerify() {
     localStorage.setItem(splitPaneKey, String(leftWidth));
   };
 
+  const hasExtractionForm = activeDocType !== '' && Boolean(verifyDocFields[activeDocType as VerifyDocType]);
   const validateActiveForm = () => {
-    const nextErrors = validateVerifyForm(activeDocType, forms[activeTab]);
+    if (!hasExtractionForm) return true;
+    const nextErrors = validateVerifyForm(activeDocType as VerifyDocType, forms[activeTab as VerifyDocumentKey] || {});
     setFormErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -272,7 +261,7 @@ export default function MatterVerify() {
         verificationStatus: payload.status,
         revisionNote: payload.note,
         extractedData: Object.fromEntries(
-          Object.entries(forms[activeTab] || {}).map(([key, value]) => [key, String(value ?? '').trim()])
+          Object.entries(forms[activeTab as VerifyDocumentKey] || {}).map(([key, value]) => [key, String(value ?? '').trim()])
         ),
       });
     },
@@ -287,13 +276,14 @@ export default function MatterVerify() {
           : variables.status === 'needs_revision'
             ? 'diminta revisi'
             : 'ditolak';
-      setFeedback(`Dokumen ${activeTabConfig.label} berhasil ${feedbackLabel}. Status di atas form diambil ulang dari database.`);
+      setFeedback(`Dokumen ${activeTabConfig?.label || activeTab} berhasil ${feedbackLabel}. Status di atas form diambil ulang dari database.`);
       await queryClient.invalidateQueries({ queryKey: ['matters', matterId] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.matterDocumentRequirements(matterId) });
       await queryClient.refetchQueries({ queryKey: ['matters', matterId], type: 'active' });
       if (variables.status === 'validated') {
         const nextTab = orderedTabs.find((tab) => {
-          const doc = documents.find((item) => item.docKey === tab.key);
-          return doc && doc.status !== 'validated' && doc.status !== 'verified' && tab.key !== activeTab;
+          const doc = tab.requirement.document;
+          return doc && doc.verificationStatus !== 'validated' && doc.verificationStatus !== 'verified' && tab.key !== activeTab;
         });
         if (nextTab) setActiveTab(nextTab.key);
       }
@@ -307,16 +297,16 @@ export default function MatterVerify() {
     },
   });
 
-  const isFormValid = isVerifyFormValid(activeDocType, forms[activeTab]);
+  const isFormValid = !hasExtractionForm || isVerifyFormValid(activeDocType as VerifyDocType, forms[activeTab as VerifyDocumentKey] || {});
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 70px - 4rem)', minHeight: '640px', width: '100%', overflow: 'hidden', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-glass)', borderRadius: '10px' }}>
-      <header style={{ minHeight: '60px', borderRadius: '10px 10px 0 0', padding: '0 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', borderBottom: '1px solid var(--border-glass)', backgroundColor: 'var(--bg-primary)', boxShadow: '0 12px 28px rgba(0,0,0,0.18)', position: 'relative', zIndex: 2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <header style={{ height: '70px', flexShrink: 0, borderRadius: '10px 10px 0 0', padding: '0 2rem', display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border-glass)', backgroundColor: 'var(--bg-primary)', boxShadow: '0 12px 28px rgba(0,0,0,0.18)', position: 'relative', zIndex: 2, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0, minWidth: 0 }}>
           <button onClick={() => navigate({ to: '/matters/$id', params: { id: matterId } })} className="btn btn-secondary" style={{ padding: '0.4rem' }}>
             <ArrowLeft size={16} />
           </button>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <h2 style={{ fontSize: '1.05rem', fontWeight: 700 }}>
               Verifikasi Dokumen • <span style={{ color: 'var(--color-emerald)', fontFamily: 'monospace' }}>{(matterRecord as any)?.caseNumber || (matterRecord as any)?.matterNumber || 'CASE-NUMBER'}</span>
             </h2>
@@ -324,13 +314,13 @@ export default function MatterVerify() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '58%', minWidth: 0, padding: '0.45rem 0' }}>
+        <div aria-label="Daftar requirement" style={{ display: 'flex', flex: 1, minWidth: 0, gap: '0.45rem', flexWrap: 'nowrap', justifyContent: 'flex-start', overflowX: 'auto', overflowY: 'hidden', padding: '0.45rem 0', scrollbarWidth: 'thin' }}>
           {orderedTabs.map((tab) => {
-            const doc = documents.find((item) => item.docKey === tab.key);
-            const isUploaded = Boolean(doc);
-            const isVerified = ['verified', 'validated'].includes(String(doc?.status));
+            const doc = tab.requirement.document;
+            const isUploaded = Boolean(doc?.documentId);
+            const isVerified = ['verified', 'validated'].includes(String(doc?.verificationStatus || tab.requirement.status));
             return (
-              <button key={tab.key} onClick={() => { if (isUploaded) setActiveTab(tab.key); }} disabled={!isUploaded} style={{ padding: '0.35rem 0.65rem', minWidth: '96px', fontSize: '0.72rem', fontWeight: 600, borderRadius: '6px', cursor: isUploaded ? 'pointer' : 'not-allowed', backgroundColor: activeTab === tab.key ? 'rgba(16, 185, 129, 0.15)' : isUploaded ? 'rgba(255,255,255,0.02)' : 'transparent', border: activeTab === tab.key ? '1px solid var(--color-emerald)' : '1px solid transparent', color: isVerified ? 'var(--color-emerald)' : isUploaded ? 'var(--text-primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', opacity: isUploaded ? 1 : 0.4, whiteSpace: 'nowrap' }}>
+              <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ padding: '0.35rem 0.65rem', minWidth: '96px', flexShrink: 0, fontSize: '0.72rem', fontWeight: 600, borderRadius: '6px', cursor: 'pointer', backgroundColor: activeTab === tab.key ? 'rgba(16, 185, 129, 0.15)' : isUploaded ? 'rgba(255,255,255,0.02)' : 'transparent', border: activeTab === tab.key ? '1px solid var(--color-emerald)' : '1px solid transparent', color: isVerified ? 'var(--color-emerald)' : isUploaded ? 'var(--text-primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', opacity: 1, whiteSpace: 'nowrap' }}>
                 {isVerified ? <CheckCircle2 size={12} /> : null}
                 {tab.label}
               </button>
@@ -340,51 +330,8 @@ export default function MatterVerify() {
       </header>
 
       <div style={{ flex: 1, display: 'flex', width: '100%', overflow: 'hidden' }}>
-        <div style={{ width: isPreviewOnly ? '100%' : `${leftWidth}%`, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-secondary)' }}>
-          <div style={{ height: '40px', borderBottom: '1px solid var(--border-glass)', padding: '0 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Berkas: <strong>{activeDoc?.fileName || 'Tidak ada file'}</strong></span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button onClick={() => setScale((value) => Math.min(value + 0.2, 3))} className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}><ZoomIn size={14} /></button>
-              <button onClick={() => setScale((value) => Math.max(value - 0.2, 0.6))} className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}><ZoomOut size={14} /></button>
-              {viewer.error ? (
-                <button onClick={() => viewer.reload()} className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>
-                  Muat Ulang
-                </button>
-              ) : null}
-              {viewer.documentBytes ? (
-                <button onClick={handleDownload} className="btn btn-primary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>
-                  <Download size={14} />
-                  Download
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: '1rem', background: '#0e121a' }}>
-            {viewer.documentObjectUrl ? viewer.isPdf ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
-                <canvas ref={canvasRef} style={{ maxWidth: '100%', height: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,0.35)' }} />
-                {pdfError ? <div style={{ color: '#fca5a5', fontSize: '0.8rem' }}>{pdfError}</div> : null}
-              </div>
-            ) : (
-              <img
-                src={viewer.documentObjectUrl}
-                alt="Document Preview"
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '100%',
-                  transform: `scale(${scale})`,
-                  transformOrigin: 'center center',
-                  transition: 'transform 0.15s ease',
-                }}
-              />
-            ) : (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                <FileText size={48} style={{ margin: '0 auto 1rem', opacity: 0.3 }} />
-                <span>Dokumen {activeTabConfig.label} belum diunggah untuk perkara ini.</span>
-              </div>
-            )}
-          </div>
+        <div style={{ width: isPreviewOnly ? '100%' : `${leftWidth}%`, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-secondary)', padding: '.75rem' }}>
+          <AuthorizedDocumentViewer document={activeDoc ? { documentId: activeDoc.id, fileName: activeDoc.fileName, mimeType: activeDoc.mimeType, downloadEndpoint: `/api/v1/documents/${activeDoc.id}/download-url` } : null} />
         </div>
 
         {!isPreviewOnly ? <div onMouseDown={handleMouseDown} style={{ width: '6px', cursor: 'col-resize', backgroundColor: 'var(--border-glass)' }} /> : null}
@@ -393,13 +340,25 @@ export default function MatterVerify() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
             <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 600, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', marginBottom: '1.25rem' }}>
-                Input Data Dokumen ({activeTabConfig.label})
+                Review Requirement ({activeTabConfig?.label || 'Pilih requirement'})
               </h3>
+
+              {activeRequirement ? <div style={{ marginBottom: '1rem', padding: '.85rem 1rem', border: '1px solid var(--border-glass)', borderRadius: 10, fontSize: '.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem', marginBottom: '.45rem' }}>
+                  <span className="badge badge-gray">{activeRequirement.requirementType}</span>
+                  <span className="badge badge-gray">{activeRequirement.requirementLevel}</span>
+                  <span className="badge badge-gray">{requirementStatusLabel(activeRequirement.status)}</span>
+                  {activeRequirement.physicalOriginalRequired ? <span className="badge badge-yellow">asli fisik wajib</span> : null}
+                  {activeRequirement.isRepeatable ? <span className="badge badge-gray">{activeRequirement.minCount}–{activeRequirement.maxCount ?? '∞'} item</span> : null}
+                </div>
+                <div>{requirementInstruction(activeRequirement)}</div>
+                {activeRequirement.condition != null ? <div style={{ marginTop: '.4rem', color: 'var(--color-gold)' }}>Kondisi: {typeof activeRequirement.condition === 'string' ? activeRequirement.condition : JSON.stringify(activeRequirement.condition)}. Keputusan applicability harus ditetapkan admin secara manual.</div> : null}
+              </div> : null}
 
               <div style={{ marginBottom: '1rem', padding: '0.9rem 1rem', borderRadius: '10px', border: '1px solid var(--border-glass)', background: 'rgba(255,255,255,0.025)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
                   <div>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>Status Verifikasi Dokumen {activeTabConfig.label}</div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>Status Verifikasi Dokumen {activeTabConfig?.label || '-'}</div>
                     <div style={{ marginTop: '0.18rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>Status tab aktif ini diambil dari data matter terbaru.</div>
                   </div>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -454,23 +413,23 @@ export default function MatterVerify() {
               ) : null}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {verifyDocFields[activeDocType].map((field) => (
+                {activeRequirement && activeRequirement.requirementType !== 'document' ? <div style={{ padding: '1rem', border: '1px dashed var(--border-glass)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '.85rem' }}>{requirementInstruction(activeRequirement)}</div> : hasExtractionForm ? verifyDocFields[activeDocType as VerifyDocType].map((field) => (
                   <div key={field.key} className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">{field.label}{field.required ? ' *' : ''}</label>
                     {field.key.toLowerCase().includes('address') || field.key === 'notes' ? (
-                      <textarea className="input-field" rows={3} value={forms[activeTab][field.key] || ''} onBlur={validateActiveForm} onChange={(event) => setForms((prev) => ({ ...prev, [activeTab]: { ...prev[activeTab], [field.key]: event.target.value } }))} />
+                      <textarea className="input-field" rows={3} value={forms[activeTab as VerifyDocumentKey]?.[field.key] || ''} onBlur={validateActiveForm} onChange={(event) => setForms((prev) => ({ ...prev, [activeTab as VerifyDocumentKey]: { ...(prev[activeTab as VerifyDocumentKey] || {}), [field.key]: event.target.value } }))} />
                     ) : (
                       <input
                         type={field.key === 'birthDate' ? 'date' : 'text'}
                         className="input-field"
-                        value={forms[activeTab][field.key] || ''}
+                        value={forms[activeTab as VerifyDocumentKey]?.[field.key] || ''}
                         onBlur={validateActiveForm}
-                        onChange={(event) => setForms((prev) => ({ ...prev, [activeTab]: { ...prev[activeTab], [field.key]: event.target.value.replace(field.key === 'nik' ? /\D/g : /$^/, '') } }))}
+                        onChange={(event) => setForms((prev) => ({ ...prev, [activeTab as VerifyDocumentKey]: { ...(prev[activeTab as VerifyDocumentKey] || {}), [field.key]: event.target.value.replace(field.key === 'nik' ? /\D/g : /$^/, '') } }))}
                       />
                     )}
                     {formErrors[field.key] ? <span style={{ color: 'var(--color-crimson)', fontSize: '0.75rem' }}>{formErrors[field.key]}</span> : null}
                   </div>
-                ))}
+                )) : <div style={{ padding: '1rem', border: '1px dashed var(--border-glass)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '.85rem' }}>Dokumen ini tidak memiliki form ekstraksi khusus. Tinjau berkas lalu pilih keputusan verifikasi.</div>}
               </div>
             </div>
 
@@ -478,7 +437,7 @@ export default function MatterVerify() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Keputusan Verifikasi</div>
                 <div style={{ marginTop: '0.2rem', fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  {activeDoc ? `Dokumen aktif: ${activeTabConfig.label}` : 'Pilih dokumen yang sudah diunggah.'}
+                  {activeDoc ? `Dokumen aktif: ${activeTabConfig?.label || activeTab}` : 'Pilih dokumen yang sudah diunggah.'}
                 </div>
                 {!canSubmitVerification ? (
                   <div style={{ marginTop: '0.35rem', color: '#fca5a5', fontSize: '0.72rem' }}>

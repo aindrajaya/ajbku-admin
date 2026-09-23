@@ -1,4 +1,5 @@
 export interface MatterListParams {
+  serviceCategoryId?: string;
   workflowStatus?: string;
   assignmentStatus?: string;
   paymentStatus?: string;
@@ -41,6 +42,7 @@ export function buildMatterListParams(params: MatterListParams = {}) {
     workflowStatus: params.workflowStatus,
     assignmentStatus: params.assignmentStatus,
     paymentStatus: params.paymentStatus,
+    serviceCategoryId: params.serviceCategoryId,
     landCityCode: params.landCityCode,
   };
 }

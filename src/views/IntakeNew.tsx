@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { buildMatterListParams, extractMatterList } from '../lib/matters';
+import { useServiceCategories } from '../lib/serviceCategories';
 import { FilePlus, ArrowLeft, Building, User, FileText, Calculator, MapPin, CheckCircle } from 'lucide-react';
 import { useSettingsStore } from '../store/settings';
 import { notifyError, notifySuccess } from '../store/ui';
@@ -37,13 +38,7 @@ export default function IntakeNew() {
     }
   });
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ['service-categories'],
-    queryFn: async () => {
-      const res = await api.get('/api/v1/matters/service-categories');
-      return Array.isArray(res.data) ? res.data : res.data?.data || [];
-    }
-  });
+  const { data: categories = [] } = useServiceCategories();
 
   const { data: matters = [] } = useQuery({
     queryKey: ['matters-raw-list'],
@@ -188,7 +183,7 @@ export default function IntakeNew() {
               >
                 {categories.map((cat: any) => (
                   <option key={cat.id} value={cat.id} style={{ background: 'var(--bg-secondary)' }}>
-                    {cat.name}
+                    {cat.name}{cat.description ? ` — ${cat.description}` : ''}
                   </option>
                 ))}
               </select>

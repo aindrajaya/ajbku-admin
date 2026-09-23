@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Building, Check, DollarSign, Save, Settings, Upload, UserCheck, Users } from 'lucide-react';
+import { Building, Check, DollarSign, Save, Settings, Upload, UserCheck, Users, FileCheck2 } from 'lucide-react';
 import { api, type AppRole } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { canAccessSettingsTab } from '../auth/access';
@@ -13,8 +13,9 @@ import {
   type TenantRatesDraft,
 } from '../store/settings';
 import { queryKeys } from '../lib/queryKeys';
+import DocumentRequirementsSettings from '../components/DocumentRequirementsSettings';
 
-type ActiveTab = 'profile' | 'staff' | 'notaries' | 'rates';
+type ActiveTab = 'profile' | 'staff' | 'notaries' | 'rates' | 'documentRequirements';
 type NoticeTone = 'success' | 'warning' | 'error';
 
 const SETTINGS_TABS: Array<{ key: ActiveTab; label: string; icon: React.ReactNode }> = [
@@ -22,6 +23,7 @@ const SETTINGS_TABS: Array<{ key: ActiveTab; label: string; icon: React.ReactNod
   { key: 'staff', label: 'Kelola Staf', icon: <Users size={16} /> },
   { key: 'notaries', label: 'Wilayah Notaris', icon: <UserCheck size={16} /> },
   { key: 'rates', label: 'Tarif Layanan', icon: <DollarSign size={16} /> },
+  { key: 'documentRequirements', label: 'Persyaratan Dokumen', icon: <FileCheck2 size={16} /> },
 ];
 
 interface NoticeState {
@@ -188,6 +190,7 @@ export default function SettingsView() {
   const canManageStaff = canAccessSettingsTab(roles, 'staff');
   const canManageNotaries = canAccessSettingsTab(roles, 'notaries');
   const canManageRates = canAccessSettingsTab(roles, 'rates');
+  const canManageDocumentRequirements = canAccessSettingsTab(roles, 'documentRequirements');
 
   const tenantId = user?.tenantId || 'tenant-id';
   const tenantSettings = useSettingsStore((state) => state.getTenantSettings(tenantId));
@@ -1001,6 +1004,8 @@ export default function SettingsView() {
               </button>
             </form>
           )}
+
+          {activeTab === 'documentRequirements' && canManageDocumentRequirements && <DocumentRequirementsSettings />}
         </div>
       </div>
     </div>
